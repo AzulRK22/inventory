@@ -176,6 +176,7 @@ export default function Home() {
       reader.readAsDataURL(itemImage);
       reader.onload = async () => {
         const base64Image = reader.result.split(",")[1]; // Obtener solo el contenido Base64
+        console.log("Base64 Image Data:", base64Image); // Depuración
 
         const visionResponse = await fetch(
           `https://vision.googleapis.com/v1/images:annotate?key=${googleVisionApiKey}`,
@@ -203,12 +204,13 @@ export default function Home() {
         );
 
         const data = await visionResponse.json();
+        console.log("Vision API Response:", data); // Depuración
 
         if (data.responses && data.responses.length > 0) {
           const labels = data.responses[0].labelAnnotations;
           if (labels && labels.length > 0) {
             // Obtener las mejores coincidencias
-            const topLabels = labels.slice(0, 3); // Obtener las 3 mejores etiquetas
+            const topLabels = labels.slice(0, 5); // Obtener las 3 mejores etiquetas
             const detectedLabels = topLabels
               .map((label) => label.description)
               .join(", ");
@@ -323,11 +325,7 @@ export default function Home() {
                     <img
                       src={item.imageURL}
                       alt={item.name}
-                      style={{
-                        maxWidth: '100%',
-                        maxHeight: '100%',
-                        objectFit: 'contain'
-                      }}
+                      style={{ width: "100%", height: "auto" }}
                     />
                   )}
                 </CardContent>
