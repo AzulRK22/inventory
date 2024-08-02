@@ -12,7 +12,6 @@ Aquí hay un par de imágenes de vista previa de la aplicación:
 ![Vista Previa 2](public/images/2.png)
 *Vista Previa del Modal de Agregar Ítem*
 
-
 ## Funcionalidades
 
 - **Gestión de Inventario**: Agrega, elimina y visualiza ítems del inventario.
