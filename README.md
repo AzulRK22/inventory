@@ -6,10 +6,10 @@ Azul's Shop es una aplicación de gestión de inventario construida con React y 
 
 Aquí hay un par de imágenes de vista previa de la aplicación:
 
-![Vista Previa 1](public/images/1.png)
+![Vista Previa 1](images/1.png)
 *Vista Previa de la Pantalla Principal*
 
-![Vista Previa 2](public/images/2.png)
+![Vista Previa 2](images/2.png)
 *Vista Previa del Modal de Agregar Ítem*
 
 ## Funcionalidades
