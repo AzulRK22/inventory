@@ -1,79 +1,124 @@
-# Azul's Shop
+# 🛒 Azul's Shop – AI-Powered Inventory Manager
 
-Azul's Shop is an inventory management application built with React and Material-UI, allowing users to add, delete, and search for items in their inventory, as well as get recipe suggestions based on available ingredients.
+Azul's Shop is a smart inventory management application built with **React** and **Material-UI**, designed to help users keep track of ingredients while leveraging **AI-powered features**.  
+You can add items, delete them, detect ingredients automatically from images using Google Vision, and even get recipe suggestions using OpenAI.
 
-## Preview
+---
 
-Here are a couple of preview images of the application:
+## ✨ Features
 
+### 🧾 Inventory Management
+- Add, delete, and browse items in your inventory.
+- View item details including images and automatically detected labels.
+
+### 📸 Smart Image Upload
+- Upload images or capture photos directly using your device camera.
+- Automatic image recognition via **Google Cloud Vision API** to detect ingredient names.
+
+### 🍳 AI Recipe Suggestions
+- One-click recipe recommendations using the **OpenAI API**, based on the ingredients you currently have.
+
+### 🔍 Fast Search
+- Quickly filter items in real time with a built-in search bar.
+
+---
+
+## 🖼 Preview
+
+### Main Screen
 ![Preview 1](images/1.png)
-*Preview of the Main Screen*
 
+### Add Item Modal
 ![Preview 2](images/2.png)
-*Preview of the Add Item Modal*
 
-## Features
+---
 
-- **Inventory Management**: Add, delete, and view items in the inventory.
-- **Image Upload**: Allows uploading item images or taking photos directly from the camera.
-- **Automatic Image Detection**: Uses the Google Cloud Vision API to automatically detect the item name from an image.
-- **Recipe Suggestions**: Get recipe suggestions based on the ingredients in your inventory using the OpenAI API.
+## 🧰 Tech Stack
 
-## Technologies
+- **React** – UI development  
+- **Material-UI** – Component styling  
+- **Firebase** – Storage + database  
+- **Google Vision API** – Ingredient/image detection  
+- **OpenAI API** – Recipe generation  
 
-- **React**: Library for building the user interface.
-- **Material-UI**: Styled UI components.
-- **Firebase**: Used for cloud storage and database.
-- **Google Cloud Vision API**: For image label detection.
-- **OpenAI API**: For recipe suggestions.
+---
 
-## Installation
+## ⚙️ Installation
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/AzulRK22/inventory.git
-   
-2. Navigate to the project directory:
-   cd inventory
-3. Install the dependencies:
-   npm install
-4. Configure the environment variables. Create a .env.local file in the root of the project with the following content:
-    NEXT_PUBLIC_API_URL=your_api_url
-    NEXT_PUBLIC_GOOGLE_VISION_API_KEY=your_google_vision_api_key
-    NEXT_PUBLIC_OPENAI_API_KEY=your_openai_api_key
-5.Start the development server:
-   npm run dev
-  Open http://localhost:3000 in your browser to see the application in action.
+### 1. Clone the repository
+```bash
+git clone https://github.com/AzulRK22/inventory.git
+cd inventory
+```
 
-## Usage
+### 2. Install dependencies
+```bash
+npm install
+```
 
-Search Items: Use the search field to filter items in the inventory.
-Add Items: Click on "Add New Item" to open the modal and add a new item. You can upload an image, take a photo, or use automatic image detection.
-Delete Items: Click on "Remove" on any item card to delete it from the inventory.
-Get Recipe Suggestions: Click on the lightbulb icon to get recipe suggestions based on the items in the inventory.
+### 3. Configure environment variables  
+Create a **.env.local** file:
 
-## Project Structure
+```
+NEXT_PUBLIC_API_URL=your_api_url
+NEXT_PUBLIC_GOOGLE_VISION_API_KEY=your_google_vision_api_key
+NEXT_PUBLIC_OPENAI_API_KEY=your_openai_api_key
+```
 
-- **pages/index.js:** Main component handling the application logic.
-- **firebase.js:** Firebase configuration.
-- **components/:** Reusable components.
+### 4. Run the development server
+```bash
+npm run dev
+```
 
-## Contributions
+Open the app at:  
+➡️ http://localhost:3000
 
-Contributions are welcome. If you would like to contribute, please open an issue or a pull request with your changes.
+---
 
-## License
+## 🚀 Usage
 
-This project is licensed under the MIT License. See the LICENSE file for more details.
+### 🔍 Search Items  
+Filter items dynamically as you type.
 
+### ➕ Add Items  
+- Click **Add New Item**
+- Upload an image or capture a photo  
+- (Optional) Let Google Vision auto-detect the ingredient  
 
-## Contact
+### 🗑 Delete Items  
+Remove items with a single click.
 
-If you have any questions, feel free to contact me through my website at https://www.azulrk.com
+### 💡 Get Recipe Suggestions  
+Click the **lightbulb icon** to generate AI-powered recipe ideas based on your current ingredients.
 
-This README.md file covers the initial setup, usage of the application, and additional details about the technologies used and how to contribute. I hope you find it helpful!
+---
 
-Let me know if you need any further adjustments!
+## 📁 Project Structure
 
+```
+inventory/
+├── app/ or pages/          # Main UI logic (depending on version)
+├── components/             # Reusable UI components
+├── images/                 # App screenshots
+├── firebase.js             # Firebase config
+├── public/                 # Static assets
+└── README.md
+```
 
+---
 
+## 🤝 Contributions
+
+Contributions are welcome!  
+Feel free to open an issue or submit a pull request.
+
+---
+
+## 📄 License
+This project is licensed under the **MIT License**.
+
+---
+
+## 📬 Contact
+Portfolio: https://www.azulrk.com  
+GitHub: https://github.com/AzulRK22
