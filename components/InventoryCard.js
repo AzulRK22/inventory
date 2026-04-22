@@ -6,6 +6,7 @@ import {
   Card,
   CardActions,
   CardContent,
+  Chip,
   IconButton,
   Stack,
   Tooltip,
@@ -33,19 +34,23 @@ export default function InventoryCard({
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
+        overflow: "hidden",
+        backgroundColor: "rgba(255,250,242,0.9)",
       }}
     >
       <CardContent>
-        <Stack spacing={2}>
+        <Stack spacing={2.25}>
           <Box
             sx={{
-              borderRadius: 2,
+              borderRadius: 3,
               overflow: "hidden",
-              backgroundColor: "#f5f5f5",
-              minHeight: 180,
+              background:
+                "linear-gradient(180deg, rgba(55,86,71,0.14), rgba(199,106,74,0.12))",
+              aspectRatio: "4 / 3",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              position: "relative",
             }}
           >
             {item.imageUrl ? (
@@ -57,36 +62,76 @@ export default function InventoryCard({
                 unoptimized
                 style={{
                   width: "100%",
-                  height: "auto",
+                  height: "100%",
                   objectFit: "cover",
                 }}
               />
             ) : (
-              <Typography color="text.secondary">Sin imagen</Typography>
+              <Stack spacing={0.5} alignItems="center" sx={{ padding: 2 }}>
+                <Typography variant="overline" color="text.secondary">
+                  Sin fotografia
+                </Typography>
+                <Typography color="text.secondary" textAlign="center">
+                  Agrega una imagen para identificarlo mejor
+                </Typography>
+              </Stack>
             )}
+            <Box sx={{ position: "absolute", inset: "auto 12px 12px auto" }}>
+              <Chip
+                label={item.category}
+                sx={{
+                  backgroundColor: "rgba(255,250,242,0.9)",
+                  backdropFilter: "blur(8px)",
+                }}
+              />
+            </Box>
           </Box>
 
-          <Stack spacing={0.5}>
+          <Stack spacing={1}>
             <Typography variant="h5">{item.name}</Typography>
-            <Typography variant="body2" color="text.secondary">
-              Categoria: {item.category}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Actualizado: {formatUpdatedAt(item.updatedAt)}
-            </Typography>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              <Chip
+                size="small"
+                label={`Clave: ${item.normalizedName}`}
+                variant="outlined"
+              />
+              <Chip
+                size="small"
+                label={`Actualizado ${formatUpdatedAt(item.updatedAt)}`}
+                variant="outlined"
+              />
+            </Stack>
           </Stack>
 
           <Box
             sx={{
-              padding: 2,
-              borderRadius: 2,
-              backgroundColor: "#eef4ff",
+              padding: 2.25,
+              borderRadius: 3,
+              background:
+                "linear-gradient(135deg, rgba(49,92,74,0.1), rgba(255,250,242,0.85))",
+              border: "1px solid rgba(49, 92, 74, 0.1)",
             }}
           >
-            <Typography variant="overline" color="text.secondary">
-              Cantidad actual
-            </Typography>
-            <Typography variant="h3">{item.quantity}</Typography>
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="flex-end"
+              spacing={2}
+            >
+              <Box>
+                <Typography variant="overline" color="text.secondary">
+                  Cantidad disponible
+                </Typography>
+                <Typography variant="h3">{item.quantity}</Typography>
+              </Box>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ maxWidth: 120, textAlign: "right" }}
+              >
+                Ajusta stock, edita datos o elimina desde aqui
+              </Typography>
+            </Stack>
           </Box>
         </Stack>
       </CardContent>
@@ -95,7 +140,8 @@ export default function InventoryCard({
         sx={{
           justifyContent: "space-between",
           paddingX: 2,
-          paddingBottom: 2,
+          paddingBottom: 2.5,
+          paddingTop: 0,
         }}
       >
         <Stack direction="row" spacing={1}>
@@ -105,13 +151,18 @@ export default function InventoryCard({
                 color="primary"
                 onClick={() => onDecrement(item)}
                 disabled={item.quantity <= 0}
+                sx={{ backgroundColor: "rgba(49, 92, 74, 0.08)" }}
               >
                 <RemoveIcon />
               </IconButton>
             </span>
           </Tooltip>
           <Tooltip title="Sumar una unidad">
-            <IconButton color="primary" onClick={() => onIncrement(item)}>
+            <IconButton
+              color="primary"
+              onClick={() => onIncrement(item)}
+              sx={{ backgroundColor: "rgba(49, 92, 74, 0.08)" }}
+            >
               <AddIcon />
             </IconButton>
           </Tooltip>
@@ -119,12 +170,20 @@ export default function InventoryCard({
 
         <Stack direction="row" spacing={1}>
           <Tooltip title="Editar producto">
-            <IconButton color="primary" onClick={() => onEdit(item)}>
+            <IconButton
+              color="primary"
+              onClick={() => onEdit(item)}
+              sx={{ backgroundColor: "rgba(49, 92, 74, 0.08)" }}
+            >
               <EditIcon />
             </IconButton>
           </Tooltip>
           <Tooltip title="Eliminar producto">
-            <IconButton color="secondary" onClick={() => onDelete(item)}>
+            <IconButton
+              color="secondary"
+              onClick={() => onDelete(item)}
+              sx={{ backgroundColor: "rgba(199, 106, 74, 0.1)" }}
+            >
               <DeleteIcon />
             </IconButton>
           </Tooltip>

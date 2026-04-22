@@ -1,6 +1,14 @@
 "use client";
 
-import { Box, Card, CardContent, CircularProgress, Grid, Stack, Typography } from "@mui/material";
+import {
+  Box,
+  Card,
+  CardContent,
+  CircularProgress,
+  Grid,
+  Stack,
+  Typography,
+} from "@mui/material";
 import InventoryCard from "@/components/InventoryCard";
 
 export default function InventoryGrid({
@@ -14,16 +22,26 @@ export default function InventoryGrid({
 }) {
   if (inventoryLoading) {
     return (
-      <Stack alignItems="center" spacing={2} paddingY={8}>
-        <CircularProgress />
-        <Typography color="text.secondary">Cargando inventario...</Typography>
-      </Stack>
+      <Card
+        variant="outlined"
+        sx={{ backgroundColor: "rgba(255, 250, 242, 0.82)", backdropFilter: "blur(14px)" }}
+      >
+        <CardContent>
+          <Stack alignItems="center" spacing={2} paddingY={6}>
+            <CircularProgress />
+            <Typography color="text.secondary">Cargando inventario...</Typography>
+          </Stack>
+        </CardContent>
+      </Card>
     );
   }
 
   if (filteredInventory.length === 0) {
     return (
-      <Card variant="outlined">
+      <Card
+        variant="outlined"
+        sx={{ backgroundColor: "rgba(255, 250, 242, 0.82)", backdropFilter: "blur(14px)" }}
+      >
         <CardContent>
           <Typography variant="h6">
             {inventory.length === 0
@@ -42,9 +60,9 @@ export default function InventoryGrid({
 
   return (
     <Box>
-      <Grid container spacing={2}>
+      <Grid container spacing={{ xs: 2, md: 2.5 }}>
         {filteredInventory.map((item) => (
-          <Grid item xs={12} sm={6} lg={4} key={item.normalizedName}>
+          <Grid item xs={12} sm={6} xl={4} key={item.normalizedName}>
             <InventoryCard
               item={item}
               onIncrement={onIncrement}

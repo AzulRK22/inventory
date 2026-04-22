@@ -1,12 +1,13 @@
 "use client";
 
 import {
+  Box,
   Button,
   Card,
   CardContent,
+  Chip,
   CircularProgress,
   FormControl,
-  IconButton,
   InputLabel,
   MenuItem,
   Select,
@@ -14,7 +15,6 @@ import {
   TextField,
   Tooltip,
   Typography,
-  Box,
 } from "@mui/material";
 import { Lightbulb as LightbulbIcon } from "@mui/icons-material";
 import { CATEGORY_OPTIONS, SORT_OPTIONS } from "@/lib/inventory";
@@ -31,44 +31,150 @@ export default function InventoryHeader({
   onFetchRecipes,
   recipeLoading,
   hasInventory,
+  summary,
 }) {
   return (
-    <>
+    <Stack spacing={2.5}>
       <Stack
         direction={{ xs: "column", md: "row" }}
         justifyContent="space-between"
         alignItems={{ xs: "flex-start", md: "center" }}
-        spacing={2}
+        spacing={2.5}
+        sx={{
+          padding: { xs: 3, md: 4 },
+          borderRadius: 6,
+          background:
+            "linear-gradient(135deg, rgba(35, 62, 51, 0.95), rgba(75, 110, 95, 0.88))",
+          color: "primary.contrastText",
+          position: "relative",
+          overflow: "hidden",
+        }}
       >
-        <Box>
-          <Typography variant="h3" component="h1">
+        <Box
+          sx={{
+            position: "absolute",
+            right: { xs: -40, md: 30 },
+            top: { xs: -50, md: -70 },
+            width: { xs: 180, md: 240 },
+            height: { xs: 180, md: 240 },
+            borderRadius: "50%",
+            background: "rgba(255,255,255,0.08)",
+          }}
+        />
+        <Box sx={{ position: "relative", zIndex: 1 }}>
+          <Chip
+            label="Inventario inteligente"
+            sx={{
+              marginBottom: 2,
+              color: "primary.contrastText",
+              backgroundColor: "rgba(255,255,255,0.12)",
+            }}
+          />
+          <Typography variant="h1" component="h1" sx={{ maxWidth: 560 }}>
             Azul&apos;s Shop
           </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Gestiona inventario con cantidades, categorias, imagenes y acciones claras.
+          <Typography
+            variant="body1"
+            sx={{
+              marginTop: 2,
+              maxWidth: 540,
+              color: "rgba(248, 244, 234, 0.84)",
+            }}
+          >
+            Gestiona tu inventario como un producto real: existencias claras,
+            categorias ordenadas, recetas contextualizadas y acciones rapidas
+            desde cualquier pantalla.
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1.5}>
+        <Stack
+          spacing={1.5}
+          sx={{ width: { xs: "100%", md: "auto" }, position: "relative", zIndex: 1 }}
+        >
+          <Button
+            variant="contained"
+            color="secondary"
+            onClick={onOpenCreate}
+            sx={{ minWidth: { xs: "100%", md: 220 } }}
+          >
+            Registrar producto
+          </Button>
           <Tooltip title="Generar sugerencias de recetas">
             <span>
-              <IconButton
-                color="primary"
+              <Button
+                variant="outlined"
                 onClick={onFetchRecipes}
                 disabled={recipeLoading || !hasInventory}
+                sx={{
+                  width: { xs: "100%", md: 220 },
+                  borderColor: "rgba(248, 244, 234, 0.28)",
+                  color: "primary.contrastText",
+                }}
               >
-                {recipeLoading ? <CircularProgress size={20} /> : <LightbulbIcon />}
-              </IconButton>
+                {recipeLoading ? (
+                  <CircularProgress size={18} sx={{ color: "inherit" }} />
+                ) : (
+                  <LightbulbIcon sx={{ marginRight: 1 }} />
+                )}
+                Inspirar recetas
+              </Button>
             </span>
           </Tooltip>
-          <Button variant="contained" onClick={onOpenCreate}>
-            Nuevo producto
-          </Button>
         </Stack>
       </Stack>
 
-      <Card variant="outlined">
+      <Stack
+        direction={{ xs: "column", md: "row" }}
+        spacing={1.5}
+        sx={{ marginTop: { xs: -1, md: -2 } }}
+      >
+        {summary.map((item) => (
+          <Card
+            key={item.label}
+            variant="outlined"
+            sx={{
+              flex: 1,
+              backgroundColor: "rgba(255, 250, 242, 0.88)",
+              backdropFilter: "blur(14px)",
+            }}
+          >
+            <CardContent sx={{ padding: 2.5 }}>
+              <Typography variant="overline" color="text.secondary">
+                {item.label}
+              </Typography>
+              <Typography variant="h4" sx={{ marginTop: 0.5, fontWeight: 700 }}>
+                {item.value}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ marginTop: 0.5 }}>
+                {item.helper}
+              </Typography>
+            </CardContent>
+          </Card>
+        ))}
+      </Stack>
+
+      <Card
+        variant="outlined"
+        sx={{
+          backgroundColor: "rgba(255, 250, 242, 0.84)",
+          backdropFilter: "blur(14px)",
+        }}
+      >
         <CardContent>
-          <Stack spacing={2}>
+          <Stack spacing={2.25}>
+            <Stack
+              direction={{ xs: "column", md: "row" }}
+              justifyContent="space-between"
+              alignItems={{ xs: "flex-start", md: "center" }}
+              spacing={1}
+            >
+              <Box>
+                <Typography variant="h6">Explorar inventario</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Busca, filtra y ordena productos para encontrar rapido lo que necesitas.
+                </Typography>
+              </Box>
+              <Chip label={searchFeedback} color="secondary" variant="outlined" />
+            </Stack>
             <Stack
               direction={{ xs: "column", md: "row" }}
               spacing={2}
@@ -113,13 +219,9 @@ export default function InventoryHeader({
                 </Select>
               </FormControl>
             </Stack>
-
-            <Typography variant="body2" color="text.secondary">
-              {searchFeedback}
-            </Typography>
           </Stack>
         </CardContent>
       </Card>
-    </>
+    </Stack>
   );
 }

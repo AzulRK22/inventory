@@ -4,13 +4,48 @@
   margin: 0;
 }
 
+:root {
+  --page-bg: #f6f0e6;
+  --text-main: #1f2a22;
+}
+
 html,
 body {
   min-height: 100%;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
-  font-family: Arial, Helvetica, sans-serif;
-  background: #f7f9fc;
-  color: #111827;
+  font-family: "Avenir Next", "Trebuchet MS", "Segoe UI", sans-serif;
+  color: var(--text-main);
+  background:
+    radial-gradient(circle at top left, rgba(199, 106, 74, 0.12), transparent 28%),
+    radial-gradient(circle at top right, rgba(49, 92, 74, 0.14), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.35), transparent 32%),
+    var(--page-bg);
+  background-attachment: fixed;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(64, 84, 69, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(64, 84, 69, 0.04) 1px, transparent 1px);
+  background-size: 36px 36px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.45), transparent 82%);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img {
+  display: block;
 }
