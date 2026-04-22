@@ -1,40 +1,50 @@
 "use client";
+
 import { useState, useEffect, useRef, useCallback } from "react";
 import { firestore, storage } from "@/firebase";
 import Image from "next/image";
 import {
+  Alert,
   Box,
-  Modal,
-  Stack,
-  TextField,
-  Typography,
   Button,
   Card,
-  CardContent,
   CardActions,
-  ThemeProvider,
-  createTheme,
-  IconButton,
-  Tooltip,
-  Grid,
-  Alert,
+  CardContent,
   CircularProgress,
+  FormControl,
+  Grid,
+  IconButton,
+  InputLabel,
+  MenuItem,
+  Modal,
+  Select,
+  Stack,
+  TextField,
+  ThemeProvider,
+  Tooltip,
+  Typography,
+  createTheme,
 } from "@mui/material";
 import {
+  Add as AddIcon,
+  DeleteOutline as DeleteIcon,
+  EditOutlined as EditIcon,
+  Lightbulb as LightbulbIcon,
+  Remove as RemoveIcon,
+} from "@mui/icons-material";
+import {
   collection,
-  query,
-  getDoc,
-  getDocs,
   deleteDoc,
-  setDoc,
   doc,
+  getDocs,
+  query,
   runTransaction,
+  serverTimestamp,
+  setDoc,
 } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import Webcam from "react-webcam";
-import LightbulbIcon from "@mui/icons-material/Lightbulb";
 
-// Configuración del tema
 const theme = createTheme({
   palette: {
     primary: {
@@ -48,6 +58,41 @@ const theme = createTheme({
     fontFamily: "Roboto, sans-serif",
   },
 });
+
+const CATEGORY_OPTIONS = [
+  "Produce",
+  "Dairy",
+  "Protein",
+  "Pantry",
+  "Frozen",
+  "Beverages",
+  "Snacks",
+  "Household",
+  "Other",
+];
+
+const SORT_OPTIONS = [
+  { value: "recent", label: "Mas recientes" },
+  { value: "name", label: "Nombre A-Z" },
+  { value: "quantity-desc", label: "Mayor cantidad" },
+  { value: "quantity-asc", label: "Menor cantidad" },
+  { value: "category", label: "Categoria" },
+];
+
+const EMPTY_FORM = {
+  itemName: "",
+  itemCategory: "Other",
+  itemImage: null,
+  imagePreview: null,
+  detectedName: "",
+  uploadOption: "upload",
+  capturing: false,
+  formError: "",
+  imageError: "",
+  imageStatus: "",
+  submitLoading: false,
+  detectLoading: false,
+};
 
 const normalizeItemName = (value) =>
   value.trim().replace(/\s+/g, " ").toLowerCase();
@@ -82,88 +127,339 @@ const fileToBase64 = (file) =>
     const reader = new FileReader();
     reader.onload = () => {
       const result = reader.result;
+
       if (typeof result !== "string") {
         reject(new Error("No se pudo leer la imagen."));
         return;
       }
+
       resolve(result.split(",")[1]);
     };
     reader.onerror = () => reject(new Error("No se pudo leer la imagen."));
     reader.readAsDataURL(file);
   });
 
+const getUpdatedAtValue = (value) => {
+  if (!value) {
+    return 0;
+  }
+
+  if (typeof value.toMillis === "function") {
+    return value.toMillis();
+  }
+
+  const parsed = new Date(value).getTime();
+  return Number.isNaN(parsed) ? 0 : parsed;
+};
+
+const formatUpdatedAt = (value) => {
+  const timestamp = getUpdatedAtValue(value);
+
+  if (!timestamp) {
+    return "Sin fecha";
+  }
+
+  return new Intl.DateTimeFormat("es-MX", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(timestamp));
+};
+
+const buildItemPayload = ({
+  itemName,
+  normalizedName,
+  category,
+  quantity,
+  imageUrl,
+}) => ({
+  name: toDisplayName(itemName),
+  normalizedName,
+  quantity,
+  imageUrl: imageUrl || "",
+  category: category || "Other",
+  updatedAt: serverTimestamp(),
+});
+
 export default function Home() {
   const [inventory, setInventory] = useState([]);
-  const [open, setOpen] = useState(false);
-  const [itemName, setItemName] = useState("");
-  const [itemImage, setItemImage] = useState(null);
+  const [inventoryLoading, setInventoryLoading] = useState(true);
+  const [inventoryError, setInventoryError] = useState("");
+  const [inventoryStatus, setInventoryStatus] = useState("");
   const [searchText, setSearchText] = useState("");
-  const [imagePreview, setImagePreview] = useState(null);
-  const [uploadOption, setUploadOption] = useState("upload"); // "upload", "take", "auto"
-  const [capturing, setCapturing] = useState(false);
-  const [detectedName, setDetectedName] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("recent");
   const [recipeSuggestions, setRecipeSuggestions] = useState([]);
-  const [formError, setFormError] = useState("");
-  const [submitLoading, setSubmitLoading] = useState(false);
-  const [detectLoading, setDetectLoading] = useState(false);
   const [recipeLoading, setRecipeLoading] = useState(false);
+  const [recipeError, setRecipeError] = useState("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+  const [formState, setFormState] = useState(EMPTY_FORM);
   const webcamRef = useRef(null);
 
-  const inventoryById = new Set(
-    inventory.map((item) => normalizeItemName(item.id || item.name))
+  const inventoryByNormalizedName = new Set(
+    inventory.map((item) => normalizeItemName(item.normalizedName || item.name))
   );
 
-  // Actualizar el inventario
+  const resetFormState = useCallback(() => {
+    setFormState(EMPTY_FORM);
+    setEditingItem(null);
+  }, []);
+
   const updateInventory = useCallback(async () => {
     try {
-      const snapshot = query(collection(firestore, "inventory"));
-      const docs = await getDocs(snapshot);
-      const inventoryList = [];
-      docs.forEach((inventoryDoc) => {
+      setInventoryLoading(true);
+      setInventoryError("");
+      const inventoryQuery = query(collection(firestore, "inventory"));
+      const snapshot = await getDocs(inventoryQuery);
+
+      const inventoryList = snapshot.docs.map((inventoryDoc) => {
         const data = inventoryDoc.data();
-        inventoryList.push({
+        const normalizedName =
+          data.normalizedName || normalizeItemName(data.name || inventoryDoc.id);
+
+        return {
           id: inventoryDoc.id,
-          name: data.displayName || toDisplayName(inventoryDoc.id),
+          name: data.name || data.displayName || toDisplayName(inventoryDoc.id),
+          normalizedName,
           quantity: data.quantity ?? 0,
-          imageURL: data.imageURL || "",
-        });
+          imageUrl: data.imageUrl || data.imageURL || "",
+          category: data.category || "Other",
+          updatedAt: data.updatedAt || null,
+        };
       });
+
       setInventory(inventoryList);
     } catch (error) {
       console.error("Error updating inventory:", error);
+      setInventoryError("No se pudo cargar el inventario.");
+    } finally {
+      setInventoryLoading(false);
     }
   }, []);
 
-  // Agregar un ítem
-  const addItem = async (item, imageFile) => {
-    try {
-      const normalizedName = normalizeItemName(item);
-      const displayName = toDisplayName(item);
-      const docRef = doc(collection(firestore, "inventory"), normalizedName);
-      let imageURL = "";
+  useEffect(() => {
+    updateInventory();
+  }, [updateInventory]);
 
-      if (imageFile) {
-        const imageRef = ref(storage, `inventory/${normalizedName}`);
-        await uploadBytes(imageRef, imageFile);
-        imageURL = await getDownloadURL(imageRef);
+  const openCreateModal = () => {
+    resetFormState();
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (item) => {
+    setEditingItem(item);
+    setFormState({
+      itemName: item.name,
+      itemCategory: item.category || "Other",
+      itemImage: null,
+      imagePreview: item.imageUrl || null,
+      detectedName: "",
+      uploadOption: item.imageUrl ? "auto" : "upload",
+      capturing: false,
+      formError: "",
+      imageError: "",
+      imageStatus: item.imageUrl ? "Imagen actual cargada." : "",
+      submitLoading: false,
+      detectLoading: false,
+    });
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    resetFormState();
+  };
+
+  const setFormValue = (key, value) => {
+    setFormState((current) => ({
+      ...current,
+      [key]: value,
+    }));
+  };
+
+  const handleImageSelection = (selectedFile, previewSource) => {
+    const imageError = validateImageFile(selectedFile);
+
+    if (imageError) {
+      setFormState((current) => ({
+        ...current,
+        itemImage: null,
+        imageError,
+        imageStatus: "",
+      }));
+      return;
+    }
+
+    setFormState((current) => ({
+      ...current,
+      itemImage: selectedFile,
+      imagePreview: previewSource,
+      imageError: "",
+      formError: "",
+      imageStatus: "Imagen lista para guardar.",
+    }));
+  };
+
+  const handleImageChange = (event) => {
+    const selectedFile = event.target.files?.[0];
+
+    if (!selectedFile) {
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => handleImageSelection(selectedFile, reader.result);
+    reader.readAsDataURL(selectedFile);
+  };
+
+  const handleCapture = async () => {
+    if (!webcamRef.current) {
+      return;
+    }
+
+    const imageSrc = webcamRef.current.getScreenshot();
+
+    if (!imageSrc) {
+      setFormValue("imageError", "No se pudo capturar la imagen.");
+      return;
+    }
+
+    const response = await fetch(imageSrc);
+    const blob = await response.blob();
+    const capturedImage = new File([blob], "captured-item.jpg", {
+      type: blob.type || "image/jpeg",
+    });
+
+    handleImageSelection(capturedImage, imageSrc);
+    setFormValue("capturing", false);
+  };
+
+  const uploadItemImage = async (normalizedName, imageFile) => {
+    if (!imageFile) {
+      return editingItem?.imageUrl || "";
+    }
+
+    const imageRef = ref(storage, `inventory/${normalizedName}`);
+    await uploadBytes(imageRef, imageFile);
+    return getDownloadURL(imageRef);
+  };
+
+  const createItem = async ({ itemName, itemCategory, itemImage }) => {
+    const normalizedName = normalizeItemName(itemName);
+    const imageUrl = await uploadItemImage(normalizedName, itemImage);
+    const docRef = doc(collection(firestore, "inventory"), normalizedName);
+
+    await setDoc(
+      docRef,
+      buildItemPayload({
+        itemName,
+        normalizedName,
+        category: itemCategory,
+        quantity: 1,
+        imageUrl,
+      }),
+      { merge: true }
+    );
+
+    setInventoryStatus(`"${toDisplayName(itemName)}" se agrego al inventario.`);
+  };
+
+  const updateItem = async ({ itemName, itemCategory, itemImage }) => {
+    const normalizedName = normalizeItemName(itemName);
+    const previousNormalizedName = editingItem.normalizedName;
+    const nextImageUrl = await uploadItemImage(normalizedName, itemImage);
+    const nextPayload = buildItemPayload({
+      itemName,
+      normalizedName,
+      category: itemCategory,
+      quantity: editingItem.quantity,
+      imageUrl: nextImageUrl,
+    });
+
+    if (normalizedName === previousNormalizedName) {
+      const docRef = doc(collection(firestore, "inventory"), normalizedName);
+      await setDoc(docRef, nextPayload, { merge: true });
+    } else {
+      await runTransaction(firestore, async (transaction) => {
+        const previousDocRef = doc(
+          collection(firestore, "inventory"),
+          previousNormalizedName
+        );
+        const nextDocRef = doc(collection(firestore, "inventory"), normalizedName);
+        const nextDoc = await transaction.get(nextDocRef);
+
+        if (nextDoc.exists()) {
+          throw new Error("Ese producto ya existe en el inventario.");
+        }
+
+        transaction.set(nextDocRef, nextPayload, { merge: true });
+        transaction.delete(previousDocRef);
+      });
+    }
+
+    setInventoryStatus(`"${toDisplayName(itemName)}" se actualizo correctamente.`);
+  };
+
+  const handleSubmit = async () => {
+    const normalizedName = normalizeItemName(formState.itemName);
+
+    if (!normalizedName) {
+      setFormValue("formError", "El nombre del producto no puede estar vacio.");
+      return;
+    }
+
+    const duplicateExists =
+      inventoryByNormalizedName.has(normalizedName) &&
+      normalizedName !== editingItem?.normalizedName;
+
+    if (duplicateExists) {
+      setFormValue("formError", "Ese producto ya existe en el inventario.");
+      return;
+    }
+
+    const imageError = validateImageFile(formState.itemImage);
+
+    if (imageError) {
+      setFormState((current) => ({
+        ...current,
+        imageError,
+        formError: imageError,
+      }));
+      return;
+    }
+
+    try {
+      setFormState((current) => ({
+        ...current,
+        submitLoading: true,
+        formError: "",
+      }));
+
+      if (editingItem) {
+        await updateItem(formState);
+      } else {
+        await createItem(formState);
       }
 
-      await setDoc(docRef, {
-        displayName,
-        quantity: 1,
-        imageURL,
-      });
-
       await updateInventory();
+      closeModal();
     } catch (error) {
-      console.error("Error adding item:", error);
-      throw error;
+      console.error("Error saving item:", error);
+      setFormValue(
+        "formError",
+        error.message || "No se pudo guardar el producto."
+      );
+    } finally {
+      setFormState((current) => ({
+        ...current,
+        submitLoading: false,
+      }));
     }
   };
 
-  const changeItemQuantity = async (itemId, delta) => {
+  const changeItemQuantity = async (item, delta) => {
     try {
-      const docRef = doc(collection(firestore, "inventory"), itemId);
+      const docRef = doc(collection(firestore, "inventory"), item.normalizedName);
 
       await runTransaction(firestore, async (transaction) => {
         const snapshot = await transaction.get(docRef);
@@ -173,94 +469,58 @@ export default function Home() {
         }
 
         const data = snapshot.data();
-        const nextQuantity = (data.quantity ?? 0) + delta;
-
-        if (nextQuantity <= 0) {
-          transaction.delete(docRef);
-          return;
-        }
+        const nextQuantity = Math.max(0, (data.quantity ?? item.quantity) + delta);
 
         transaction.set(
           docRef,
           {
             ...data,
             quantity: nextQuantity,
+            updatedAt: serverTimestamp(),
           },
           { merge: true }
         );
       });
 
+      setInventoryStatus(
+        `Cantidad de "${item.name}" actualizada a ${item.quantity + delta}.`
+      );
       await updateInventory();
     } catch (error) {
-      console.error("Error changing item quantity:", error);
+      console.error("Error changing quantity:", error);
+      setInventoryError("No se pudo actualizar la cantidad.");
     }
   };
 
-  // Inicializar el inventario al cargar el componente
-  useEffect(() => {
-    updateInventory();
-  }, [updateInventory]);
-
-  // Manejar la apertura y cierre del modal
-  const handleOpen = () => setOpen(true);
-  const handleClose = () => {
-    setItemName("");
-    setItemImage(null);
-    setImagePreview(null);
-    setUploadOption("upload");
-    setCapturing(false);
-    setDetectedName("");
-    setFormError("");
-    setOpen(false);
-  };
-
-  // Manejar el cambio de imagen (carga desde el dispositivo)
-  const handleImageChange = (e) => {
-    const selectedFile = e.target.files[0];
-
-    if (selectedFile) {
-      const imageError = validateImageFile(selectedFile);
-      if (imageError) {
-        setFormError(imageError);
-        return;
-      }
-
-      setFormError("");
-      setItemImage(selectedFile);
-      const reader = new FileReader();
-      reader.onload = () => setImagePreview(reader.result);
-      reader.readAsDataURL(selectedFile);
+  const deleteItem = async (item) => {
+    try {
+      await deleteDoc(doc(collection(firestore, "inventory"), item.normalizedName));
+      setInventoryStatus(`"${item.name}" se elimino del inventario.`);
+      await updateInventory();
+    } catch (error) {
+      console.error("Error deleting item:", error);
+      setInventoryError("No se pudo eliminar el producto.");
     }
   };
 
-  // Manejar la captura de imagen desde la cámara
-  const handleCapture = () => {
-    if (webcamRef.current) {
-      const imageSrc = webcamRef.current.getScreenshot();
-      fetch(imageSrc)
-        .then((res) => res.blob())
-        .then((blob) => {
-          const capturedImage = new File([blob], "captured-item.jpg", {
-            type: blob.type || "image/jpeg",
-          });
-          setFormError("");
-          setItemImage(capturedImage);
-          setImagePreview(imageSrc);
-          setCapturing(false);
-        });
-    }
-  };
-
-  // Detectar el nombre de la imagen usando Google Cloud Vision API
   const handleAutoDetect = async () => {
     try {
-      if (!itemImage) {
-        setFormError("Sube o captura una imagen antes de detectar el producto.");
+      if (!formState.itemImage) {
+        setFormState((current) => ({
+          ...current,
+          formError: "Sube o captura una imagen antes de detectar el producto.",
+          imageError: "Falta una imagen para analizar.",
+        }));
         return;
       }
 
-      setDetectLoading(true);
-      setFormError("");
+      setFormState((current) => ({
+        ...current,
+        detectLoading: true,
+        imageError: "",
+        formError: "",
+        imageStatus: "Analizando imagen...",
+      }));
 
       const response = await fetch("/api/vision", {
         method: "POST",
@@ -268,7 +528,7 @@ export default function Home() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          imageBase64: await fileToBase64(itemImage),
+          imageBase64: await fileToBase64(formState.itemImage),
         }),
       });
 
@@ -278,26 +538,39 @@ export default function Home() {
         throw new Error(data.error || "No se pudo detectar el producto.");
       }
 
-      setDetectedName(data.detectedName || "No se pudo detectar el nombre.");
+      setFormState((current) => ({
+        ...current,
+        detectedName: data.detectedName || "No se pudo detectar el nombre.",
+        imageStatus: "Imagen analizada correctamente.",
+      }));
     } catch (error) {
-      console.error("Error detecting image:", error);
-      setFormError(error.message || "No se pudo detectar el producto.");
+      console.error("Error detecting item:", error);
+      setFormState((current) => ({
+        ...current,
+        imageError: error.message || "No se pudo detectar el producto.",
+        imageStatus: "",
+      }));
     } finally {
-      setDetectLoading(false);
+      setFormState((current) => ({
+        ...current,
+        detectLoading: false,
+      }));
     }
   };
 
-  // Obtener sugerencias de recetas usando OpenAI API
-  const fetchRecipeSuggestions = async (inventoryList) => {
+  const fetchRecipeSuggestions = async () => {
     try {
       setRecipeLoading(true);
+      setRecipeError("");
+      setRecipeSuggestions([]);
+
       const response = await fetch("/api/recipes", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          items: inventoryList.map((item) => item.name),
+          items: inventory.map((item) => item.name),
         }),
       });
 
@@ -310,312 +583,510 @@ export default function Home() {
       setRecipeSuggestions(data.recipes || []);
     } catch (error) {
       console.error("Error fetching recipe suggestions:", error);
+      setRecipeError(
+        error.message || "No se pudieron generar sugerencias de recetas."
+      );
     } finally {
       setRecipeLoading(false);
     }
   };
 
-  const handleSubmit = async () => {
-    const normalizedName = normalizeItemName(itemName);
-    const imageError = validateImageFile(itemImage);
+  const filteredInventory = inventory
+    .filter((item) => {
+      const searchableText = [
+        item.name,
+        item.normalizedName,
+        item.category,
+        String(item.quantity),
+      ]
+        .join(" ")
+        .toLowerCase();
 
-    if (!normalizedName) {
-      setFormError("El nombre del producto no puede estar vacio.");
-      return;
-    }
+      const matchesSearch = searchableText.includes(searchText.toLowerCase());
+      const matchesCategory =
+        categoryFilter === "all" || item.category === categoryFilter;
 
-    if (inventoryById.has(normalizedName)) {
-      setFormError("Ese producto ya existe en el inventario.");
-      return;
-    }
+      return matchesSearch && matchesCategory;
+    })
+    .sort((left, right) => {
+      if (sortBy === "name") {
+        return left.name.localeCompare(right.name);
+      }
 
-    if (imageError) {
-      setFormError(imageError);
-      return;
-    }
+      if (sortBy === "quantity-desc") {
+        return right.quantity - left.quantity;
+      }
 
-    try {
-      setSubmitLoading(true);
-      setFormError("");
-      await addItem(itemName, itemImage);
-      handleClose();
-    } catch (error) {
-      setFormError("No se pudo guardar el producto. Intenta de nuevo.");
-    } finally {
-      setSubmitLoading(false);
-    }
-  };
+      if (sortBy === "quantity-asc") {
+        return left.quantity - right.quantity;
+      }
 
-  // Filtrar inventario basado en búsqueda
-  const filteredInventory = inventory.filter((item) =>
-    `${item.name} ${item.id}`.toLowerCase().includes(searchText.toLowerCase())
-  );
+      if (sortBy === "category") {
+        return left.category.localeCompare(right.category) || left.name.localeCompare(right.name);
+      }
+
+      return getUpdatedAtValue(right.updatedAt) - getUpdatedAtValue(left.updatedAt);
+    });
+
+  const searchFeedback = searchText
+    ? `${filteredInventory.length} resultado(s) para "${searchText}".`
+    : `${filteredInventory.length} producto(s) en vista.`;
 
   return (
     <ThemeProvider theme={theme}>
       <Box
-        width="100vw"
-        height="100vh"
+        width="100%"
+        minHeight="100vh"
         display="flex"
         flexDirection="column"
         alignItems="center"
-        padding={3}
+        padding={{ xs: 2, md: 4 }}
       >
-        <Typography variant="h3" component="div" sx={{ marginBottom: 2 }}>
-          Azul&apos;s Shop
-        </Typography>
-        <Stack
-          direction="row"
-          spacing={2}
-          alignItems="center"
-          width="100%"
-          maxWidth="800px"
-        >
-          <TextField
-            variant="outlined"
-            placeholder="Buscar ítems..."
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            sx={{ flex: 1 }}
-          />
-          <Tooltip title="Obtener sugerencias de recetas">
-            <IconButton
-              color="primary"
-              onClick={() => fetchRecipeSuggestions(inventory)}
-              disabled={recipeLoading || inventory.length === 0}
-            >
-              {recipeLoading ? <CircularProgress size={20} /> : <LightbulbIcon />}
-            </IconButton>
-          </Tooltip>
-        </Stack>
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={handleOpen}
-          sx={{ marginTop: 2 }} // Ajuste del margen para separar el botón
-        >
-          Add New Item
-        </Button>
-
-        <Grid
-          container
-          spacing={2}
-          justifyContent="center"
-          sx={{ marginTop: 2, maxWidth: "1000px" }}
-        >
-          {filteredInventory.map((item) => (
-            <Grid item xs={12} sm={6} md={4} key={item.name}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h5" component="div">
-                    {item.name}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Cantidad: {item.quantity}
-                  </Typography>
-                  {item.imageURL && (
-                    <Image
-                      src={item.imageURL}
-                      alt={item.name}
-                      width={600}
-                      height={400}
-                      unoptimized
-                      style={{ width: "100%", height: "auto" }}
-                    />
-                  )}
-                </CardContent>
-                <CardActions>
-                  <Button
-                    size="small"
+        <Stack spacing={3} width="100%" maxWidth="1120px">
+          <Stack
+            direction={{ xs: "column", md: "row" }}
+            justifyContent="space-between"
+            alignItems={{ xs: "flex-start", md: "center" }}
+            spacing={2}
+          >
+            <Box>
+              <Typography variant="h3" component="h1">
+                Azul&apos;s Shop
+              </Typography>
+              <Typography variant="body1" color="text.secondary">
+                Gestiona inventario con cantidades, categorias, imagenes y acciones claras.
+              </Typography>
+            </Box>
+            <Stack direction="row" spacing={1.5}>
+              <Tooltip title="Generar sugerencias de recetas">
+                <span>
+                  <IconButton
                     color="primary"
-                    onClick={() => changeItemQuantity(item.id, 1)}
+                    onClick={fetchRecipeSuggestions}
+                    disabled={recipeLoading || inventory.length === 0}
                   >
-                    Add
-                  </Button>
-                  <Button
-                    size="small"
-                    color="secondary"
-                    onClick={() => changeItemQuantity(item.id, -1)}
-                  >
-                    Remove
-                  </Button>
-                </CardActions>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
+                    {recipeLoading ? (
+                      <CircularProgress size={20} />
+                    ) : (
+                      <LightbulbIcon />
+                    )}
+                  </IconButton>
+                </span>
+              </Tooltip>
+              <Button variant="contained" onClick={openCreateModal}>
+                Nuevo producto
+              </Button>
+            </Stack>
+          </Stack>
 
-        {/* Modal for adding items */}
-        <Modal open={open} onClose={handleClose}>
+          {inventoryStatus && <Alert severity="success">{inventoryStatus}</Alert>}
+          {inventoryError && <Alert severity="error">{inventoryError}</Alert>}
+
+          <Card variant="outlined">
+            <CardContent>
+              <Stack spacing={2}>
+                <Stack
+                  direction={{ xs: "column", md: "row" }}
+                  spacing={2}
+                  alignItems={{ xs: "stretch", md: "center" }}
+                >
+                  <TextField
+                    label="Buscar en inventario"
+                    placeholder="Nombre, categoria o cantidad"
+                    value={searchText}
+                    onChange={(event) => setSearchText(event.target.value)}
+                    sx={{ flex: 2 }}
+                  />
+                  <FormControl sx={{ minWidth: 180 }}>
+                    <InputLabel id="category-filter-label">Categoria</InputLabel>
+                    <Select
+                      labelId="category-filter-label"
+                      value={categoryFilter}
+                      label="Categoria"
+                      onChange={(event) => setCategoryFilter(event.target.value)}
+                    >
+                      <MenuItem value="all">Todas</MenuItem>
+                      {CATEGORY_OPTIONS.map((category) => (
+                        <MenuItem key={category} value={category}>
+                          {category}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <FormControl sx={{ minWidth: 180 }}>
+                    <InputLabel id="sort-by-label">Ordenar</InputLabel>
+                    <Select
+                      labelId="sort-by-label"
+                      value={sortBy}
+                      label="Ordenar"
+                      onChange={(event) => setSortBy(event.target.value)}
+                    >
+                      {SORT_OPTIONS.map((option) => (
+                        <MenuItem key={option.value} value={option.value}>
+                          {option.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Stack>
+
+                <Typography variant="body2" color="text.secondary">
+                  {searchFeedback}
+                </Typography>
+              </Stack>
+            </CardContent>
+          </Card>
+
+          <Box>
+            {inventoryLoading ? (
+              <Stack alignItems="center" spacing={2} paddingY={8}>
+                <CircularProgress />
+                <Typography color="text.secondary">
+                  Cargando inventario...
+                </Typography>
+              </Stack>
+            ) : filteredInventory.length === 0 ? (
+              <Card variant="outlined">
+                <CardContent>
+                  <Typography variant="h6">
+                    {inventory.length === 0
+                      ? "Tu inventario esta vacio."
+                      : "No encontramos productos con esos filtros."}
+                  </Typography>
+                  <Typography color="text.secondary" sx={{ marginTop: 1 }}>
+                    {inventory.length === 0
+                      ? "Agrega tu primer producto para empezar a gestionar existencias."
+                      : "Prueba con otra busqueda, categoria o criterio de orden."}
+                  </Typography>
+                </CardContent>
+              </Card>
+            ) : (
+              <Grid container spacing={2}>
+                {filteredInventory.map((item) => (
+                  <Grid item xs={12} sm={6} lg={4} key={item.normalizedName}>
+                    <Card
+                      sx={{
+                        height: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <CardContent>
+                        <Stack spacing={2}>
+                          <Box
+                            sx={{
+                              borderRadius: 2,
+                              overflow: "hidden",
+                              backgroundColor: "#f5f5f5",
+                              minHeight: 180,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            {item.imageUrl ? (
+                              <Image
+                                src={item.imageUrl}
+                                alt={item.name}
+                                width={600}
+                                height={400}
+                                unoptimized
+                                style={{
+                                  width: "100%",
+                                  height: "auto",
+                                  objectFit: "cover",
+                                }}
+                              />
+                            ) : (
+                              <Typography color="text.secondary">
+                                Sin imagen
+                              </Typography>
+                            )}
+                          </Box>
+
+                          <Stack spacing={0.5}>
+                            <Typography variant="h5">{item.name}</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              Categoria: {item.category}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              Actualizado: {formatUpdatedAt(item.updatedAt)}
+                            </Typography>
+                          </Stack>
+
+                          <Box
+                            sx={{
+                              padding: 2,
+                              borderRadius: 2,
+                              backgroundColor: "#eef4ff",
+                            }}
+                          >
+                            <Typography variant="overline" color="text.secondary">
+                              Cantidad actual
+                            </Typography>
+                            <Typography variant="h3">{item.quantity}</Typography>
+                          </Box>
+                        </Stack>
+                      </CardContent>
+
+                      <CardActions
+                        sx={{
+                          justifyContent: "space-between",
+                          paddingX: 2,
+                          paddingBottom: 2,
+                        }}
+                      >
+                        <Stack direction="row" spacing={1}>
+                          <Tooltip title="Restar una unidad">
+                            <span>
+                              <IconButton
+                                color="primary"
+                                onClick={() => changeItemQuantity(item, -1)}
+                                disabled={item.quantity <= 0}
+                              >
+                                <RemoveIcon />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                          <Tooltip title="Sumar una unidad">
+                            <IconButton
+                              color="primary"
+                              onClick={() => changeItemQuantity(item, 1)}
+                            >
+                              <AddIcon />
+                            </IconButton>
+                          </Tooltip>
+                        </Stack>
+
+                        <Stack direction="row" spacing={1}>
+                          <Tooltip title="Editar producto">
+                            <IconButton
+                              color="primary"
+                              onClick={() => openEditModal(item)}
+                            >
+                              <EditIcon />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Eliminar producto">
+                            <IconButton
+                              color="secondary"
+                              onClick={() => deleteItem(item)}
+                            >
+                              <DeleteIcon />
+                            </IconButton>
+                          </Tooltip>
+                        </Stack>
+                      </CardActions>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            )}
+          </Box>
+
+          <Card variant="outlined">
+            <CardContent>
+              <Stack spacing={2}>
+                <Typography variant="h6">Recipe Suggestions</Typography>
+                {recipeError && <Alert severity="error">{recipeError}</Alert>}
+                {recipeLoading ? (
+                  <Stack direction="row" spacing={1.5} alignItems="center">
+                    <CircularProgress size={20} />
+                    <Typography color="text.secondary">
+                      Generando recetas...
+                    </Typography>
+                  </Stack>
+                ) : recipeSuggestions.length > 0 ? (
+                  <Stack spacing={1.5}>
+                    {recipeSuggestions.map((recipe, index) => (
+                      <Card key={`${recipe}-${index}`} variant="outlined">
+                        <CardContent>
+                          <Typography>{recipe}</Typography>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </Stack>
+                ) : (
+                  <Typography color="text.secondary">
+                    {inventory.length === 0
+                      ? "Agrega productos al inventario para recibir recetas."
+                      : "Todavia no has generado sugerencias de recetas."}
+                  </Typography>
+                )}
+              </Stack>
+            </CardContent>
+          </Card>
+        </Stack>
+
+        <Modal open={isModalOpen} onClose={closeModal}>
           <Box
             sx={{
               position: "absolute",
               top: "50%",
               left: "50%",
               transform: "translate(-50%, -50%)",
-              width: 400,
+              width: { xs: "92%", sm: 520 },
+              maxHeight: "90vh",
+              overflowY: "auto",
               bgcolor: "background.paper",
-              borderRadius: 1,
+              borderRadius: 2,
               boxShadow: 24,
               p: 4,
             }}
           >
-            <Typography variant="h6" component="h2" gutterBottom>
-              Add New Item
-            </Typography>
-            {formError && (
-              <Alert severity="error" sx={{ marginBottom: 2 }}>
-                {formError}
-              </Alert>
-            )}
-            <TextField
-              label="Item Name"
-              variant="outlined"
-              fullWidth
-              margin="normal"
-              value={itemName}
-              onChange={(e) => setItemName(e.target.value)}
-              error={Boolean(formError)}
-            />
-            <Stack spacing={2} marginTop={2}>
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={() => setUploadOption("upload")}
-              >
-                Upload Image
-              </Button>
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={() => setUploadOption("take")}
-              >
-                Take Photo
-              </Button>
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={() => setUploadOption("auto")}
-              >
-                Auto Detect
-              </Button>
-            </Stack>
-            {uploadOption === "upload" && (
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageChange}
-                style={{ marginTop: 16 }}
+            <Stack spacing={2.5}>
+              <Box>
+                <Typography variant="h6" component="h2">
+                  {editingItem ? "Editar producto" : "Nuevo producto"}
+                </Typography>
+                <Typography color="text.secondary">
+                  Guarda nombre, categoria, imagen y mantén el inventario ordenado.
+                </Typography>
+              </Box>
+
+              {formState.formError && (
+                <Alert severity="error">{formState.formError}</Alert>
+              )}
+              {formState.imageError && (
+                <Alert severity="warning">{formState.imageError}</Alert>
+              )}
+              {formState.imageStatus && (
+                <Alert severity="info">{formState.imageStatus}</Alert>
+              )}
+
+              <TextField
+                label="Nombre del producto"
+                value={formState.itemName}
+                onChange={(event) => setFormValue("itemName", event.target.value)}
+                fullWidth
               />
-            )}
-            {uploadOption === "take" && (
-              <>
+
+              <FormControl fullWidth>
+                <InputLabel id="item-category-label">Categoria</InputLabel>
+                <Select
+                  labelId="item-category-label"
+                  label="Categoria"
+                  value={formState.itemCategory}
+                  onChange={(event) =>
+                    setFormValue("itemCategory", event.target.value)
+                  }
+                >
+                  {CATEGORY_OPTIONS.map((category) => (
+                    <MenuItem key={category} value={category}>
+                      {category}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap>
+                <Button
+                  variant={formState.uploadOption === "upload" ? "contained" : "outlined"}
+                  onClick={() => setFormValue("uploadOption", "upload")}
+                >
+                  Subir imagen
+                </Button>
+                <Button
+                  variant={formState.uploadOption === "take" ? "contained" : "outlined"}
+                  onClick={() => setFormValue("uploadOption", "take")}
+                >
+                  Tomar foto
+                </Button>
+                <Button
+                  variant={formState.uploadOption === "auto" ? "contained" : "outlined"}
+                  onClick={() => setFormValue("uploadOption", "auto")}
+                >
+                  Detectar
+                </Button>
+              </Stack>
+
+              {formState.uploadOption === "upload" && (
+                <Button variant="outlined" component="label">
+                  Elegir archivo
+                  <input hidden type="file" accept="image/*" onChange={handleImageChange} />
+                </Button>
+              )}
+
+              {formState.uploadOption === "take" && (
+                <Stack spacing={2}>
+                  <Box
+                    sx={{
+                      position: "relative",
+                      height: 260,
+                      border: "1px solid #d0d7de",
+                      borderRadius: 2,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <Webcam
+                      audio={false}
+                      ref={webcamRef}
+                      screenshotFormat="image/jpeg"
+                      width="100%"
+                      height="100%"
+                    />
+                  </Box>
+                  <Button
+                    variant="contained"
+                    onClick={handleCapture}
+                    disabled={formState.detectLoading}
+                  >
+                    Capturar imagen
+                  </Button>
+                </Stack>
+              )}
+
+              {formState.uploadOption === "auto" && (
+                <Stack spacing={1.5}>
+                  <Typography color="text.secondary">
+                    {formState.detectedName ||
+                      "Sube o captura una imagen y luego usa la deteccion automatica."}
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    onClick={handleAutoDetect}
+                    disabled={!formState.itemImage || formState.detectLoading}
+                  >
+                    {formState.detectLoading ? "Detectando..." : "Detectar producto"}
+                  </Button>
+                </Stack>
+              )}
+
+              {formState.imagePreview && (
                 <Box
                   sx={{
-                    position: "relative",
-                    height: "240px",
-                    width: "100%",
-                    border: "1px solid #ccc",
-                    marginTop: 2,
+                    borderRadius: 2,
+                    overflow: "hidden",
+                    backgroundColor: "#f5f5f5",
                   }}
                 >
-                  <Webcam
-                    audio={false}
-                    ref={webcamRef}
-                    screenshotFormat="image/jpeg"
-                    width="100%"
-                    height="100%"
+                  <Image
+                    src={formState.imagePreview}
+                    alt="Vista previa"
+                    width={1200}
+                    height={900}
+                    unoptimized
+                    style={{ width: "100%", height: "auto" }}
                   />
-                  {capturing && (
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      onClick={handleCapture}
-                      sx={{
-                        position: "absolute",
-                        bottom: 16,
-                        left: "50%",
-                        transform: "translateX(-50%)",
-                      }}
-                    >
-                      Capture
-                    </Button>
-                  )}
                 </Box>
+              )}
+
+              <Stack direction="row" spacing={2} justifyContent="flex-end">
+                <Button variant="outlined" onClick={closeModal}>
+                  Cancelar
+                </Button>
                 <Button
                   variant="contained"
-                  color="primary"
-                  onClick={() => setCapturing(!capturing)}
-                  sx={{ marginTop: 2 }}
+                  onClick={handleSubmit}
+                  disabled={formState.submitLoading}
                 >
-                  {capturing ? "Stop Capturing" : "Start Capturing"}
+                  {formState.submitLoading ? "Guardando..." : editingItem ? "Guardar cambios" : "Agregar producto"}
                 </Button>
-              </>
-            )}
-            {uploadOption === "auto" && (
-              <Box>
-                <Typography variant="body1" gutterBottom>
-                  {detectedName || "No item detected yet."}
-                </Typography>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  onClick={handleAutoDetect}
-                  disabled={!itemImage || detectLoading}
-                >
-                  {detectLoading ? "Detecting..." : "Detect Item"}
-                </Button>
-              </Box>
-            )}
-            {imagePreview && (
-              <Box sx={{ marginTop: 2 }}>
-                <Image
-                  src={imagePreview}
-                  alt="Preview"
-                  width={1200}
-                  height={900}
-                  unoptimized
-                  style={{ width: "100%", height: "auto" }}
-                />
-              </Box>
-            )}
-            <Stack direction="row" spacing={2} marginTop={2}>
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={handleSubmit}
-                disabled={submitLoading}
-              >
-                {submitLoading ? "Saving..." : "Add Item"}
-              </Button>
-              <Button
-                variant="outlined"
-                color="secondary"
-                onClick={handleClose}
-              >
-                Cancel
-              </Button>
+              </Stack>
             </Stack>
           </Box>
         </Modal>
-
-        {/* Suggestions Section */}
-        {recipeSuggestions.length > 0 && (
-          <Box sx={{ marginTop: 4 }}>
-            <Typography variant="h6" component="div">
-              Recipe Suggestions
-            </Typography>
-            <Stack spacing={2} marginTop={2}>
-              {recipeSuggestions.map((recipe, index) => (
-                <Card key={index} variant="outlined">
-                  <CardContent>
-                    <Typography variant="body1">{recipe}</Typography>
-                  </CardContent>
-                </Card>
-              ))}
-            </Stack>
-          </Box>
-        )}
       </Box>
     </ThemeProvider>
   );
