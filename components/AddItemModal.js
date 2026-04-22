@@ -29,6 +29,7 @@ export default function AddItemModal({
   onImageChange,
   onCapture,
   onAutoDetect,
+  onApplyDetectionSuggestion,
   onSubmit,
 }) {
   const steps = [
@@ -185,6 +186,31 @@ export default function AddItemModal({
                   {formState.detectedName ||
                     "Primero sube o captura una imagen y luego usa la deteccion automatica."}
                 </Typography>
+                {formState.detectionSuggestions?.length > 0 && (
+                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                    {formState.detectionSuggestions.map((suggestion) => (
+                      <Chip
+                        key={suggestion}
+                        label={suggestion}
+                        onClick={() => onApplyDetectionSuggestion(suggestion)}
+                        color={
+                          suggestion === formState.itemName ? "secondary" : "primary"
+                        }
+                        variant={
+                          suggestion === formState.itemName ? "filled" : "outlined"
+                        }
+                      />
+                    ))}
+                  </Stack>
+                )}
+                {formState.suggestedCategory && (
+                  <Chip
+                    label={`Categoria sugerida: ${formState.suggestedCategory}`}
+                    color="secondary"
+                    variant="outlined"
+                    sx={{ alignSelf: "flex-start" }}
+                  />
+                )}
                 <Button
                   variant="contained"
                   onClick={onAutoDetect}
@@ -208,6 +234,9 @@ export default function AddItemModal({
                   variant="outlined"
                 />
                 <Chip label={`Categoria: ${formState.itemCategory}`} variant="outlined" />
+                {formState.detectedName && (
+                  <Chip label={`Deteccion: ${formState.detectedName}`} variant="outlined" />
+                )}
               </Stack>
 
               {formState.imagePreview ? (

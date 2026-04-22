@@ -8,25 +8,30 @@ import {
   createEditFormState,
   createEmptyFormState,
   mapInventoryDoc,
+  mapMovementDoc,
   normalizeItemName,
+  suggestCategoryFromText,
   toDisplayName,
   validateImageFile,
 } from "@/lib/inventory";
 import {
+  addDoc,
   collection,
   deleteDoc,
   doc,
   getDocs,
   query,
   runTransaction,
-  setDoc,
   serverTimestamp,
+  setDoc,
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 
 export function useInventory() {
   const [inventory, setInventory] = useState([]);
+  const [movementHistory, setMovementHistory] = useState([]);
   const [inventoryLoading, setInventoryLoading] = useState(true);
+  const [movementLoading, setMovementLoading] = useState(true);
   const [inventoryError, setInventoryError] = useState("");
   const [inventoryStatus, setInventoryStatus] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -37,21 +42,50 @@ export function useInventory() {
   const updateInventory = useCallback(async () => {
     try {
       setInventoryLoading(true);
+      setMovementLoading(true);
       setInventoryError("");
-      const inventoryQuery = query(collection(firestore, "inventory"));
-      const snapshot = await getDocs(inventoryQuery);
-      setInventory(snapshot.docs.map(mapInventoryDoc));
+
+      const [inventorySnapshot, movementSnapshot] = await Promise.all([
+        getDocs(query(collection(firestore, "inventory"))),
+        getDocs(query(collection(firestore, "inventory_movements"))),
+      ]);
+
+      setInventory(inventorySnapshot.docs.map(mapInventoryDoc));
+      setMovementHistory(
+        movementSnapshot.docs
+          .map(mapMovementDoc)
+          .sort((left, right) => {
+            const leftValue =
+              typeof left.createdAt?.toMillis === "function"
+                ? left.createdAt.toMillis()
+                : 0;
+            const rightValue =
+              typeof right.createdAt?.toMillis === "function"
+                ? right.createdAt.toMillis()
+                : 0;
+            return rightValue - leftValue;
+          })
+          .slice(0, 40)
+      );
     } catch (error) {
       console.error("Error updating inventory:", error);
       setInventoryError("No se pudo cargar el inventario.");
     } finally {
       setInventoryLoading(false);
+      setMovementLoading(false);
     }
   }, []);
 
   useEffect(() => {
     updateInventory();
   }, [updateInventory]);
+
+  const recordMovement = useCallback(async (movement) => {
+    await addDoc(collection(firestore, "inventory_movements"), {
+      ...movement,
+      createdAt: serverTimestamp(),
+    });
+  }, []);
 
   const resetFormState = useCallback(() => {
     setFormState(createEmptyFormState());
@@ -101,6 +135,8 @@ export function useInventory() {
       imageError: "",
       formError: "",
       imageStatus: "Imagen lista para guardar.",
+      detectionSuggestions: [],
+      suggestedCategory: "",
     }));
   }, []);
 
@@ -158,6 +194,7 @@ export function useInventory() {
     async ({ itemName, itemCategory, itemImage }) => {
       const normalizedName = normalizeItemName(itemName);
       const imageUrl = await uploadItemImage(normalizedName, itemImage);
+      const resolvedCategory = itemCategory || suggestCategoryFromText(itemName);
       const docRef = doc(collection(firestore, "inventory"), normalizedName);
 
       await setDoc(
@@ -165,16 +202,26 @@ export function useInventory() {
         buildItemPayload({
           itemName,
           normalizedName,
-          category: itemCategory,
+          category: resolvedCategory,
           quantity: 1,
           imageUrl,
         }),
         { merge: true }
       );
 
+      await recordMovement({
+        itemName: toDisplayName(itemName),
+        normalizedName,
+        action: "created",
+        quantityChange: 1,
+        quantityAfter: 1,
+        category: resolvedCategory,
+        note: "Producto agregado al inventario.",
+      });
+
       setInventoryStatus(`"${toDisplayName(itemName)}" se agrego al inventario.`);
     },
-    [uploadItemImage]
+    [recordMovement, uploadItemImage]
   );
 
   const updateItem = useCallback(
@@ -186,17 +233,21 @@ export function useInventory() {
       const normalizedName = normalizeItemName(itemName);
       const previousNormalizedName = editingItem.normalizedName;
       const nextImageUrl = await uploadItemImage(normalizedName, itemImage);
+      const resolvedCategory = itemCategory || suggestCategoryFromText(itemName);
       const nextPayload = buildItemPayload({
         itemName,
         normalizedName,
-        category: itemCategory,
+        category: resolvedCategory,
         quantity: editingItem.quantity,
         imageUrl: nextImageUrl,
       });
 
       if (normalizedName === previousNormalizedName) {
-        const docRef = doc(collection(firestore, "inventory"), normalizedName);
-        await setDoc(docRef, nextPayload, { merge: true });
+        await setDoc(
+          doc(collection(firestore, "inventory"), normalizedName),
+          nextPayload,
+          { merge: true }
+        );
       } else {
         await runTransaction(firestore, async (transaction) => {
           const previousDocRef = doc(
@@ -218,11 +269,19 @@ export function useInventory() {
         });
       }
 
-      setInventoryStatus(
-        `"${toDisplayName(itemName)}" se actualizo correctamente.`
-      );
+      await recordMovement({
+        itemName: toDisplayName(itemName),
+        normalizedName,
+        action: "updated",
+        quantityChange: 0,
+        quantityAfter: editingItem.quantity,
+        category: resolvedCategory,
+        note: "Datos del producto actualizados.",
+      });
+
+      setInventoryStatus(`"${toDisplayName(itemName)}" se actualizo correctamente.`);
     },
-    [editingItem, uploadItemImage]
+    [editingItem, recordMovement, uploadItemImage]
   );
 
   const handleSubmit = useCallback(async () => {
@@ -320,24 +379,44 @@ export function useInventory() {
           );
         });
 
-        setInventoryStatus(
-          `Cantidad de "${item.name}" actualizada a ${nextQuantity}.`
-        );
+        await recordMovement({
+          itemName: item.name,
+          normalizedName: item.normalizedName,
+          action: delta > 0 ? "incremented" : "decremented",
+          quantityChange: delta,
+          quantityAfter: nextQuantity,
+          category: item.category,
+          note:
+            delta > 0
+              ? "Entrada manual de inventario."
+              : "Salida manual de inventario.",
+        });
+
+        setInventoryStatus(`Cantidad de "${item.name}" actualizada a ${nextQuantity}.`);
         await updateInventory();
       } catch (error) {
         console.error("Error changing quantity:", error);
         setInventoryError("No se pudo actualizar la cantidad.");
       }
     },
-    [updateInventory]
+    [recordMovement, updateInventory]
   );
 
   const deleteItem = useCallback(
     async (item) => {
       try {
-        await deleteDoc(
-          doc(collection(firestore, "inventory"), item.normalizedName)
-        );
+        await deleteDoc(doc(collection(firestore, "inventory"), item.normalizedName));
+
+        await recordMovement({
+          itemName: item.name,
+          normalizedName: item.normalizedName,
+          action: "deleted",
+          quantityChange: -item.quantity,
+          quantityAfter: 0,
+          category: item.category,
+          note: "Producto eliminado del inventario.",
+        });
+
         setInventoryStatus(`"${item.name}" se elimino del inventario.`);
         await updateInventory();
       } catch (error) {
@@ -345,7 +424,7 @@ export function useInventory() {
         setInventoryError("No se pudo eliminar el producto.");
       }
     },
-    [updateInventory]
+    [recordMovement, updateInventory]
   );
 
   const handleAutoDetect = useCallback(async () => {
@@ -367,11 +446,17 @@ export function useInventory() {
         imageStatus: "Analizando imagen...",
       }));
 
-      const detectedName = await detectItemFromImage(formState.itemImage);
+      const detection = await detectItemFromImage(formState.itemImage);
 
       setFormState((current) => ({
         ...current,
-        detectedName,
+        detectedName: detection.suggestedName || detection.detectedName || "",
+        detectionSuggestions: detection.suggestions || [],
+        suggestedCategory: detection.suggestedCategory || "",
+        itemCategory:
+          current.itemCategory === "Other" && detection.suggestedCategory
+            ? detection.suggestedCategory
+            : current.itemCategory,
         imageStatus: "Imagen analizada correctamente.",
       }));
     } catch (error) {
@@ -389,9 +474,23 @@ export function useInventory() {
     }
   }, [formState.itemImage]);
 
+  const applyDetectionSuggestion = useCallback((suggestion) => {
+    setFormState((current) => ({
+      ...current,
+      itemName: suggestion,
+      itemCategory:
+        current.suggestedCategory && current.itemCategory === "Other"
+          ? current.suggestedCategory
+          : current.itemCategory,
+      formError: "",
+    }));
+  }, []);
+
   return {
     inventory,
+    movementHistory,
     inventoryLoading,
+    movementLoading,
     inventoryError,
     inventoryStatus,
     isModalOpen,
@@ -403,6 +502,7 @@ export function useInventory() {
     openEditModal,
     closeModal,
     setFormValue,
+    applyDetectionSuggestion,
     handleImageChange,
     handleCapture,
     handleSubmit,

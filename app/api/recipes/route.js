@@ -31,24 +31,23 @@ export async function POST(request) {
         {
           role: "system",
           content:
-            "You suggest practical recipes. Respond with a plain text list, one recipe per line, without numbering.",
+            "Devuelve recetas practicas en JSON valido. Responde solo con un objeto JSON con la clave recipes. Cada receta debe incluir title, servings, time, summary y steps como arreglo de strings. Escribe todo en español.",
         },
         {
           role: "user",
-          content: `Suggest recipes using only or mostly these ingredients: ${items.join(
+          content: `Genera 3 recetas modernas y realistas usando solamente o mayormente estos ingredientes: ${items.join(
             ", "
           )}.`,
         },
       ],
-      max_tokens: 200,
-      temperature: 0.7,
+      max_tokens: 700,
+      temperature: 0.8,
+      response_format: { type: "json_object" },
     });
 
     const content = response.choices[0]?.message?.content || "";
-    const recipes = content
-      .split("\n")
-      .map((recipe) => recipe.replace(/^[-*]\s*/, "").trim())
-      .filter(Boolean);
+    const parsed = JSON.parse(content);
+    const recipes = Array.isArray(parsed.recipes) ? parsed.recipes : [];
 
     return NextResponse.json({ recipes });
   } catch (error) {

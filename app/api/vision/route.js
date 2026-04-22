@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import vision from "@google-cloud/vision";
+import { getSuggestedDetection } from "@/lib/inventory";
 
 export const runtime = "nodejs";
 
@@ -23,14 +24,22 @@ export async function POST(request) {
     });
 
     const labels = result.labelAnnotations ?? [];
-    const detectedName = labels
-      .slice(0, 5)
-      .map((label) => label.description)
-      .filter(Boolean)
-      .join(", ");
+    const topLabels = labels
+      .slice(0, 6)
+      .map((label) => ({
+        description: label.description || "",
+        score: label.score || 0,
+      }))
+      .filter((label) => label.description);
+    const { suggestedName, suggestedCategory, suggestions } =
+      getSuggestedDetection(topLabels.map((label) => label.description));
 
     return NextResponse.json({
-      detectedName: detectedName || "No se pudo detectar el nombre.",
+      detectedName: suggestedName || "No se pudo detectar el nombre.",
+      suggestedName,
+      suggestedCategory,
+      suggestions,
+      labels: topLabels,
     });
   } catch (error) {
     console.error("Vision API error:", error);
