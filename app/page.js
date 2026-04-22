@@ -1,6 +1,7 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { firestore, storage } from "@/firebase";
+import Image from "next/image";
 import {
   Box,
   Modal,
@@ -16,6 +17,8 @@ import {
   IconButton,
   Tooltip,
   Grid,
+  Alert,
+  CircularProgress,
 } from "@mui/material";
 import {
   collection,
@@ -25,10 +28,10 @@ import {
   deleteDoc,
   setDoc,
   doc,
+  runTransaction,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import Webcam from "react-webcam";
-import SearchIcon from "@mui/icons-material/Search";
 import LightbulbIcon from "@mui/icons-material/Lightbulb";
 
 // Configuración del tema
@@ -46,6 +49,49 @@ const theme = createTheme({
   },
 });
 
+const normalizeItemName = (value) =>
+  value.trim().replace(/\s+/g, " ").toLowerCase();
+
+const toDisplayName = (value) =>
+  value
+    .trim()
+    .replace(/\s+/g, " ")
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+
+const validateImageFile = (file) => {
+  if (!file) {
+    return "";
+  }
+
+  if (!file.type?.startsWith("image/")) {
+    return "Selecciona un archivo de imagen valido.";
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    return "La imagen debe pesar 5 MB o menos.";
+  }
+
+  return "";
+};
+
+const fileToBase64 = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result !== "string") {
+        reject(new Error("No se pudo leer la imagen."));
+        return;
+      }
+      resolve(result.split(",")[1]);
+    };
+    reader.onerror = () => reject(new Error("No se pudo leer la imagen."));
+    reader.readAsDataURL(file);
+  });
+
 export default function Home() {
   const [inventory, setInventory] = useState([]);
   const [open, setOpen] = useState(false);
@@ -57,79 +103,103 @@ export default function Home() {
   const [capturing, setCapturing] = useState(false);
   const [detectedName, setDetectedName] = useState("");
   const [recipeSuggestions, setRecipeSuggestions] = useState([]);
+  const [formError, setFormError] = useState("");
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [detectLoading, setDetectLoading] = useState(false);
+  const [recipeLoading, setRecipeLoading] = useState(false);
   const webcamRef = useRef(null);
 
-  // Obtener la URL del servidor desde las variables de entorno
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-  const googleVisionApiKey = process.env.NEXT_PUBLIC_GOOGLE_VISION_API_KEY;
-  const openAiApiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY;
+  const inventoryById = new Set(
+    inventory.map((item) => normalizeItemName(item.id || item.name))
+  );
 
   // Actualizar el inventario
-  const updateInventory = async () => {
+  const updateInventory = useCallback(async () => {
     try {
       const snapshot = query(collection(firestore, "inventory"));
       const docs = await getDocs(snapshot);
       const inventoryList = [];
-      docs.forEach((doc) => {
+      docs.forEach((inventoryDoc) => {
+        const data = inventoryDoc.data();
         inventoryList.push({
-          name: doc.id,
-          ...doc.data(),
+          id: inventoryDoc.id,
+          name: data.displayName || toDisplayName(inventoryDoc.id),
+          quantity: data.quantity ?? 0,
+          imageURL: data.imageURL || "",
         });
       });
       setInventory(inventoryList);
     } catch (error) {
       console.error("Error updating inventory:", error);
     }
-  };
+  }, []);
 
   // Agregar un ítem
   const addItem = async (item, imageFile) => {
     try {
-      const docRef = doc(collection(firestore, "inventory"), item);
-      const docSnap = await getDoc(docRef);
+      const normalizedName = normalizeItemName(item);
+      const displayName = toDisplayName(item);
+      const docRef = doc(collection(firestore, "inventory"), normalizedName);
+      let imageURL = "";
 
-      if (docSnap.exists()) {
-        const { quantity } = docSnap.data();
-        await setDoc(docRef, { quantity: quantity + 1 });
-      } else {
-        let imageURL = "";
-        if (imageFile) {
-          const imageRef = ref(storage, `inventory/${item}`);
-          await uploadBytes(imageRef, imageFile);
-          imageURL = await getDownloadURL(imageRef);
-        }
-        await setDoc(docRef, { quantity: 1, imageURL });
+      if (imageFile) {
+        const imageRef = ref(storage, `inventory/${normalizedName}`);
+        await uploadBytes(imageRef, imageFile);
+        imageURL = await getDownloadURL(imageRef);
       }
+
+      await setDoc(docRef, {
+        displayName,
+        quantity: 1,
+        imageURL,
+      });
+
       await updateInventory();
     } catch (error) {
       console.error("Error adding item:", error);
+      throw error;
     }
   };
 
-  // Eliminar un ítem
-  const removeItem = async (item) => {
+  const changeItemQuantity = async (itemId, delta) => {
     try {
-      const docRef = doc(collection(firestore, "inventory"), item);
-      const docSnap = await getDoc(docRef);
+      const docRef = doc(collection(firestore, "inventory"), itemId);
 
-      if (docSnap.exists()) {
-        const { quantity } = docSnap.data();
-        if (quantity === 1) {
-          await deleteDoc(docRef);
-        } else {
-          await setDoc(docRef, { quantity: quantity - 1 });
+      await runTransaction(firestore, async (transaction) => {
+        const snapshot = await transaction.get(docRef);
+
+        if (!snapshot.exists()) {
+          return;
         }
-      }
+
+        const data = snapshot.data();
+        const nextQuantity = (data.quantity ?? 0) + delta;
+
+        if (nextQuantity <= 0) {
+          transaction.delete(docRef);
+          return;
+        }
+
+        transaction.set(
+          docRef,
+          {
+            ...data,
+            quantity: nextQuantity,
+          },
+          { merge: true }
+        );
+      });
+
       await updateInventory();
     } catch (error) {
-      console.error("Error removing item:", error);
+      console.error("Error changing item quantity:", error);
     }
   };
 
   // Inicializar el inventario al cargar el componente
   useEffect(() => {
     updateInventory();
-  }, []);
+  }, [updateInventory]);
 
   // Manejar la apertura y cierre del modal
   const handleOpen = () => setOpen(true);
@@ -140,16 +210,26 @@ export default function Home() {
     setUploadOption("upload");
     setCapturing(false);
     setDetectedName("");
+    setFormError("");
     setOpen(false);
   };
 
   // Manejar el cambio de imagen (carga desde el dispositivo)
   const handleImageChange = (e) => {
-    if (e.target.files[0]) {
-      setItemImage(e.target.files[0]);
+    const selectedFile = e.target.files[0];
+
+    if (selectedFile) {
+      const imageError = validateImageFile(selectedFile);
+      if (imageError) {
+        setFormError(imageError);
+        return;
+      }
+
+      setFormError("");
+      setItemImage(selectedFile);
       const reader = new FileReader();
       reader.onload = () => setImagePreview(reader.result);
-      reader.readAsDataURL(e.target.files[0]);
+      reader.readAsDataURL(selectedFile);
     }
   };
 
@@ -160,7 +240,11 @@ export default function Home() {
       fetch(imageSrc)
         .then((res) => res.blob())
         .then((blob) => {
-          setItemImage(blob);
+          const capturedImage = new File([blob], "captured-item.jpg", {
+            type: blob.type || "image/jpeg",
+          });
+          setFormError("");
+          setItemImage(capturedImage);
           setImagePreview(imageSrc);
           setCapturing(false);
         });
@@ -170,97 +254,101 @@ export default function Home() {
   // Detectar el nombre de la imagen usando Google Cloud Vision API
   const handleAutoDetect = async () => {
     try {
-      if (!itemImage) return;
+      if (!itemImage) {
+        setFormError("Sube o captura una imagen antes de detectar el producto.");
+        return;
+      }
 
-      const reader = new FileReader();
-      reader.readAsDataURL(itemImage);
-      reader.onload = async () => {
-        const base64Image = reader.result.split(",")[1]; // Obtener solo el contenido Base64
-        console.log("Base64 Image Data:", base64Image); // Depuración
+      setDetectLoading(true);
+      setFormError("");
 
-        const visionResponse = await fetch(
-          `https://vision.googleapis.com/v1/images:annotate?key=${googleVisionApiKey}`,
-          {
-            method: "POST",
-            body: JSON.stringify({
-              requests: [
-                {
-                  image: {
-                    content: base64Image,
-                  },
-                  features: [
-                    {
-                      type: "LABEL_DETECTION",
-                      maxResults: 10, // Obtener más resultados para mejor precisión
-                    },
-                  ],
-                },
-              ],
-            }),
-            headers: {
-              "Content-Type": "application/json",
-            },
-          }
-        );
+      const response = await fetch("/api/vision", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          imageBase64: await fileToBase64(itemImage),
+        }),
+      });
 
-        const data = await visionResponse.json();
-        console.log("Vision API Response:", data); // Depuración
+      const data = await response.json();
 
-        if (data.responses && data.responses.length > 0) {
-          const labels = data.responses[0].labelAnnotations;
-          if (labels && labels.length > 0) {
-            // Obtener las mejores coincidencias
-            const topLabels = labels.slice(0, 5); // Obtener las 3 mejores etiquetas
-            const detectedLabels = topLabels
-              .map((label) => label.description)
-              .join(", ");
-            setDetectedName(detectedLabels || "No se pudo detectar el nombre.");
-          } else {
-            setDetectedName("No se pudo detectar el nombre.");
-          }
-        } else {
-          setDetectedName("No se pudo detectar el nombre.");
-        }
-      };
+      if (!response.ok) {
+        throw new Error(data.error || "No se pudo detectar el producto.");
+      }
+
+      setDetectedName(data.detectedName || "No se pudo detectar el nombre.");
     } catch (error) {
       console.error("Error detecting image:", error);
+      setFormError(error.message || "No se pudo detectar el producto.");
+    } finally {
+      setDetectLoading(false);
     }
   };
 
   // Obtener sugerencias de recetas usando OpenAI API
   const fetchRecipeSuggestions = async (inventoryList) => {
     try {
-      const items = inventoryList.map((item) => item.name).join(", ");
-
-      const response = await fetch(
-        "https://api.openai.com/v1/engines/davinci-codex/completions",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${openAiApiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            prompt: `Suggest recipes using the following ingredients: ${items}.`,
-            max_tokens: 150,
-          }),
-        }
-      );
+      setRecipeLoading(true);
+      const response = await fetch("/api/recipes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          items: inventoryList.map((item) => item.name),
+        }),
+      });
 
       const data = await response.json();
-      setRecipeSuggestions(
-        data.choices[0].text
-          .split("\n")
-          .filter((recipe) => recipe.trim() !== "")
-      );
+
+      if (!response.ok) {
+        throw new Error(data.error || "No se pudieron obtener sugerencias.");
+      }
+
+      setRecipeSuggestions(data.recipes || []);
     } catch (error) {
       console.error("Error fetching recipe suggestions:", error);
+    } finally {
+      setRecipeLoading(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    const normalizedName = normalizeItemName(itemName);
+    const imageError = validateImageFile(itemImage);
+
+    if (!normalizedName) {
+      setFormError("El nombre del producto no puede estar vacio.");
+      return;
+    }
+
+    if (inventoryById.has(normalizedName)) {
+      setFormError("Ese producto ya existe en el inventario.");
+      return;
+    }
+
+    if (imageError) {
+      setFormError(imageError);
+      return;
+    }
+
+    try {
+      setSubmitLoading(true);
+      setFormError("");
+      await addItem(itemName, itemImage);
+      handleClose();
+    } catch (error) {
+      setFormError("No se pudo guardar el producto. Intenta de nuevo.");
+    } finally {
+      setSubmitLoading(false);
     }
   };
 
   // Filtrar inventario basado en búsqueda
   const filteredInventory = inventory.filter((item) =>
-    item.name.toLowerCase().includes(searchText.toLowerCase())
+    `${item.name} ${item.id}`.toLowerCase().includes(searchText.toLowerCase())
   );
 
   return (
@@ -274,7 +362,7 @@ export default function Home() {
         padding={3}
       >
         <Typography variant="h3" component="div" sx={{ marginBottom: 2 }}>
-          Azul's Shop
+          Azul&apos;s Shop
         </Typography>
         <Stack
           direction="row"
@@ -294,8 +382,9 @@ export default function Home() {
             <IconButton
               color="primary"
               onClick={() => fetchRecipeSuggestions(inventory)}
+              disabled={recipeLoading || inventory.length === 0}
             >
-              <LightbulbIcon />
+              {recipeLoading ? <CircularProgress size={20} /> : <LightbulbIcon />}
             </IconButton>
           </Tooltip>
         </Stack>
@@ -321,10 +410,16 @@ export default function Home() {
                   <Typography variant="h5" component="div">
                     {item.name}
                   </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Cantidad: {item.quantity}
+                  </Typography>
                   {item.imageURL && (
-                    <img
+                    <Image
                       src={item.imageURL}
                       alt={item.name}
+                      width={600}
+                      height={400}
+                      unoptimized
                       style={{ width: "100%", height: "auto" }}
                     />
                   )}
@@ -333,7 +428,14 @@ export default function Home() {
                   <Button
                     size="small"
                     color="primary"
-                    onClick={() => removeItem(item.name)}
+                    onClick={() => changeItemQuantity(item.id, 1)}
+                  >
+                    Add
+                  </Button>
+                  <Button
+                    size="small"
+                    color="secondary"
+                    onClick={() => changeItemQuantity(item.id, -1)}
                   >
                     Remove
                   </Button>
@@ -361,6 +463,11 @@ export default function Home() {
             <Typography variant="h6" component="h2" gutterBottom>
               Add New Item
             </Typography>
+            {formError && (
+              <Alert severity="error" sx={{ marginBottom: 2 }}>
+                {formError}
+              </Alert>
+            )}
             <TextField
               label="Item Name"
               variant="outlined"
@@ -368,6 +475,7 @@ export default function Home() {
               margin="normal"
               value={itemName}
               onChange={(e) => setItemName(e.target.value)}
+              error={Boolean(formError)}
             />
             <Stack spacing={2} marginTop={2}>
               <Button
@@ -453,18 +561,21 @@ export default function Home() {
                   variant="contained"
                   color="primary"
                   onClick={handleAutoDetect}
-                  disabled={!itemImage}
+                  disabled={!itemImage || detectLoading}
                 >
-                  Detect Item
+                  {detectLoading ? "Detecting..." : "Detect Item"}
                 </Button>
               </Box>
             )}
             {imagePreview && (
               <Box sx={{ marginTop: 2 }}>
-                <img
+                <Image
                   src={imagePreview}
                   alt="Preview"
-                  style={{ width: "100%" }}
+                  width={1200}
+                  height={900}
+                  unoptimized
+                  style={{ width: "100%", height: "auto" }}
                 />
               </Box>
             )}
@@ -472,12 +583,10 @@ export default function Home() {
               <Button
                 variant="contained"
                 color="primary"
-                onClick={() => {
-                  addItem(itemName, itemImage);
-                  handleClose();
-                }}
+                onClick={handleSubmit}
+                disabled={submitLoading}
               >
-                Add Item
+                {submitLoading ? "Saving..." : "Add Item"}
               </Button>
               <Button
                 variant="outlined"
