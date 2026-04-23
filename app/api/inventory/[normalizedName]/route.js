@@ -13,7 +13,7 @@ export async function PUT(request, { params }) {
 
     if (!itemName?.trim()) {
       return NextResponse.json(
-        { error: "El nombre del producto es obligatorio." },
+        { error: "Product name is required." },
         { status: 400 }
       );
     }
@@ -29,7 +29,7 @@ export async function PUT(request, { params }) {
   } catch (error) {
     console.error("Inventory PUT error:", error);
     return NextResponse.json(
-      { error: error.message || "No se pudo actualizar el producto." },
+      { error: error.message || "The product could not be updated." },
       { status: 400 }
     );
   }
@@ -41,7 +41,7 @@ export async function PATCH(request, { params }) {
 
     if (typeof delta !== "number" || Number.isNaN(delta)) {
       return NextResponse.json(
-        { error: "Se necesita un cambio numerico de cantidad." },
+        { error: "A numeric quantity delta is required." },
         { status: 400 }
       );
     }
@@ -52,7 +52,7 @@ export async function PATCH(request, { params }) {
   } catch (error) {
     console.error("Inventory PATCH error:", error);
     return NextResponse.json(
-      { error: error.message || "No se pudo actualizar la cantidad." },
+      { error: error.message || "Quantity could not be updated." },
       { status: 400 }
     );
   }
@@ -65,7 +65,7 @@ export async function DELETE(_request, { params }) {
   } catch (error) {
     console.error("Inventory DELETE error:", error);
     return NextResponse.json(
-      { error: error.message || "No se pudo eliminar el producto." },
+      { error: error.message || "The product could not be deleted." },
       { status: 400 }
     );
   }

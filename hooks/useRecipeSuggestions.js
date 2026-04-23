@@ -18,7 +18,7 @@ export function useRecipeSuggestions() {
     } catch (error) {
       console.error("Error fetching recipe suggestions:", error);
       setRecipeError(
-        error.message || "No se pudieron generar sugerencias de recetas."
+        error.message || "Recipe suggestions could not be generated."
       );
     } finally {
       setRecipeLoading(false);

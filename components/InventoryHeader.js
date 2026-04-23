@@ -63,7 +63,7 @@ export default function InventoryHeader({
         />
         <Box sx={{ position: "relative", zIndex: 1 }}>
           <Chip
-            label="Inventario inteligente"
+            label="Smart inventory"
             sx={{
               marginBottom: 2,
               color: "primary.contrastText",
@@ -81,9 +81,9 @@ export default function InventoryHeader({
               color: "rgba(248, 244, 234, 0.84)",
             }}
           >
-            Gestiona tu inventario como un producto real: existencias claras,
-            categorias ordenadas, vision asistida, recetas contextualizadas y
-            acciones rapidas desde cualquier pantalla.
+            Run your pantry like a polished product: clear stock levels,
+            organized categories, AI-assisted vision, contextual recipes, and
+            fast actions from one place.
           </Typography>
         </Box>
         <Stack
@@ -96,9 +96,9 @@ export default function InventoryHeader({
             onClick={onOpenCreate}
             sx={{ minWidth: { xs: "100%", md: 220 } }}
           >
-            Registrar producto
+            Add product
           </Button>
-          <Tooltip title="Generar sugerencias de recetas">
+          <Tooltip title="Generate recipe suggestions">
             <span>
               <Button
                 variant="outlined"
@@ -115,7 +115,7 @@ export default function InventoryHeader({
                 ) : (
                   <LightbulbIcon sx={{ marginRight: 1 }} />
                 )}
-                Inspirar recetas
+                Generate recipes
               </Button>
             </span>
           </Tooltip>
@@ -168,9 +168,9 @@ export default function InventoryHeader({
               spacing={1}
             >
               <Box>
-                <Typography variant="h6">Explorar inventario</Typography>
+                <Typography variant="h6">Browse inventory</Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Busca, filtra y ordena productos para encontrar rapido lo que necesitas.
+                  Search, filter, and sort products to find what you need fast.
                 </Typography>
               </Box>
               <Chip label={searchFeedback} color="secondary" variant="outlined" />
@@ -181,21 +181,21 @@ export default function InventoryHeader({
               alignItems={{ xs: "stretch", md: "center" }}
             >
               <TextField
-                label="Buscar en inventario"
-                placeholder="Nombre, categoria o cantidad"
+                label="Search inventory"
+                placeholder="Name, category, or quantity"
                 value={searchText}
                 onChange={(event) => onSearchChange(event.target.value)}
                 sx={{ flex: 2 }}
               />
               <FormControl sx={{ minWidth: 180 }}>
-                <InputLabel id="category-filter-label">Categoria</InputLabel>
+                <InputLabel id="category-filter-label">Category</InputLabel>
                 <Select
                   labelId="category-filter-label"
                   value={categoryFilter}
-                  label="Categoria"
+                  label="Category"
                   onChange={(event) => onCategoryFilterChange(event.target.value)}
                 >
-                  <MenuItem value="all">Todas</MenuItem>
+                  <MenuItem value="all">All</MenuItem>
                   {CATEGORY_OPTIONS.map((category) => (
                     <MenuItem key={category} value={category}>
                       {category}
@@ -204,11 +204,11 @@ export default function InventoryHeader({
                 </Select>
               </FormControl>
               <FormControl sx={{ minWidth: 180 }}>
-                <InputLabel id="sort-by-label">Ordenar</InputLabel>
+                <InputLabel id="sort-by-label">Sort by</InputLabel>
                 <Select
                   labelId="sort-by-label"
                   value={sortBy}
-                  label="Ordenar"
+                  label="Sort by"
                   onChange={(event) => onSortByChange(event.target.value)}
                 >
                   {SORT_OPTIONS.map((option) => (

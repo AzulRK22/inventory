@@ -69,10 +69,10 @@ export default function InventoryCard({
             ) : (
               <Stack spacing={0.5} alignItems="center" sx={{ padding: 2 }}>
                 <Typography variant="overline" color="text.secondary">
-                  Sin fotografia
+                  No image
                 </Typography>
                 <Typography color="text.secondary" textAlign="center">
-                  Agrega una imagen para identificarlo mejor
+                  Add a photo to identify it faster
                 </Typography>
               </Stack>
             )}
@@ -92,12 +92,12 @@ export default function InventoryCard({
             <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
               <Chip
                 size="small"
-                label={`Clave: ${item.normalizedName}`}
+                label={`Key: ${item.normalizedName}`}
                 variant="outlined"
               />
               <Chip
                 size="small"
-                label={`Actualizado ${formatUpdatedAt(item.updatedAt)}`}
+                label={`Updated ${formatUpdatedAt(item.updatedAt)}`}
                 variant="outlined"
               />
             </Stack>
@@ -120,7 +120,7 @@ export default function InventoryCard({
             >
               <Box>
                 <Typography variant="overline" color="text.secondary">
-                  Cantidad disponible
+                  Quantity on hand
                 </Typography>
                 <Typography variant="h3">{item.quantity}</Typography>
               </Box>
@@ -129,7 +129,7 @@ export default function InventoryCard({
                 color="text.secondary"
                 sx={{ maxWidth: 120, textAlign: "right" }}
               >
-                Ajusta stock, edita datos o elimina desde aqui
+                Adjust stock, edit details, or remove it here
               </Typography>
             </Stack>
           </Box>
@@ -145,7 +145,7 @@ export default function InventoryCard({
         }}
       >
         <Stack direction="row" spacing={1}>
-          <Tooltip title="Restar una unidad">
+          <Tooltip title="Decrease by one">
             <span>
               <IconButton
                 color="primary"
@@ -157,7 +157,7 @@ export default function InventoryCard({
               </IconButton>
             </span>
           </Tooltip>
-          <Tooltip title="Sumar una unidad">
+          <Tooltip title="Increase by one">
             <IconButton
               color="primary"
               onClick={() => onIncrement(item)}
@@ -169,7 +169,7 @@ export default function InventoryCard({
         </Stack>
 
         <Stack direction="row" spacing={1}>
-          <Tooltip title="Editar producto">
+          <Tooltip title="Edit product">
             <IconButton
               color="primary"
               onClick={() => onEdit(item)}
@@ -178,7 +178,7 @@ export default function InventoryCard({
               <EditIcon />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Eliminar producto">
+          <Tooltip title="Delete product">
             <IconButton
               color="secondary"
               onClick={() => onDelete(item)}

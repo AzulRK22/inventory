@@ -2,12 +2,12 @@ import "./globals.css";
 
 export const metadata = {
   title: "BlueShelf AI",
-  description: "Inventario inteligente con Supabase, visión asistida y recetas generadas con IA.",
+  description: "Smart inventory management with Supabase, AI-assisted image analysis, and recipe suggestions.",
 };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="es">
+    <html lang="en">
       <body>{children}</body>
     </html>
   );

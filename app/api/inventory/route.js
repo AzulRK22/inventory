@@ -10,7 +10,7 @@ export async function GET() {
   } catch (error) {
     console.error("Inventory GET error:", error);
     return NextResponse.json(
-      { error: error.message || "No se pudo cargar el inventario." },
+      { error: error.message || "Inventory could not be loaded." },
       { status: 500 }
     );
   }
@@ -22,7 +22,7 @@ export async function POST(request) {
 
     if (!itemName?.trim()) {
       return NextResponse.json(
-        { error: "El nombre del producto es obligatorio." },
+        { error: "Product name is required." },
         { status: 400 }
       );
     }
@@ -37,7 +37,7 @@ export async function POST(request) {
   } catch (error) {
     console.error("Inventory POST error:", error);
     return NextResponse.json(
-      { error: error.message || "No se pudo crear el producto." },
+      { error: error.message || "The product could not be created." },
       { status: 400 }
     );
   }

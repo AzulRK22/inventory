@@ -9,14 +9,14 @@ export async function POST(request) {
 
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
-        { error: "Se necesita al menos un ingrediente." },
+        { error: "At least one ingredient is required." },
         { status: 400 }
       );
     }
 
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json(
-        { error: "Falta configurar OPENAI_API_KEY en el servidor." },
+        { error: "OPENAI_API_KEY is missing on the server." },
         { status: 500 }
       );
     }
@@ -31,11 +31,11 @@ export async function POST(request) {
         {
           role: "system",
           content:
-            "Devuelve recetas practicas en JSON valido. Responde solo con un objeto JSON con la clave recipes. Cada receta debe incluir title, servings, time, summary y steps como arreglo de strings. Escribe todo en español.",
+            "Return practical recipes in valid JSON. Reply only with a JSON object containing the key recipes. Each recipe must include title, servings, time, summary, and steps as an array of strings. Write everything in English.",
         },
         {
           role: "user",
-          content: `Genera 3 recetas modernas y realistas usando solamente o mayormente estos ingredientes: ${items.join(
+          content: `Generate 3 modern, realistic recipes using only or mostly these ingredients: ${items.join(
             ", "
           )}.`,
         },
@@ -53,7 +53,7 @@ export async function POST(request) {
   } catch (error) {
     console.error("OpenAI API error:", error);
     return NextResponse.json(
-      { error: "No se pudieron generar sugerencias de recetas." },
+      { error: "Recipe suggestions could not be generated." },
       { status: 500 }
     );
   }

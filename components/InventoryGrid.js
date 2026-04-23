@@ -29,7 +29,7 @@ export default function InventoryGrid({
         <CardContent>
           <Stack alignItems="center" spacing={2} paddingY={6}>
             <CircularProgress />
-            <Typography color="text.secondary">Cargando inventario...</Typography>
+            <Typography color="text.secondary">Loading inventory...</Typography>
           </Stack>
         </CardContent>
       </Card>
@@ -45,13 +45,13 @@ export default function InventoryGrid({
         <CardContent>
           <Typography variant="h6">
             {inventory.length === 0
-              ? "Tu inventario esta vacio."
-              : "No encontramos productos con esos filtros."}
+              ? "Your inventory is empty."
+              : "No products matched those filters."}
           </Typography>
           <Typography color="text.secondary" sx={{ marginTop: 1 }}>
             {inventory.length === 0
-              ? "Agrega tu primer producto para empezar a gestionar existencias."
-              : "Prueba con otra busqueda, categoria o criterio de orden."}
+              ? "Add your first product to start managing stock."
+              : "Try a different search, category, or sorting rule."}
           </Typography>
         </CardContent>
       </Card>

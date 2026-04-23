@@ -1,16 +1,16 @@
 # BlueShelf AI
 
-BlueShelf AI es una app de inventario inteligente construida con Next.js, Supabase y OpenAI. Sirve para registrar productos, ajustar cantidades, organizar categorías, analizar imágenes de artículos y generar ideas de recetas con lo que ya tienes disponible.
+BlueShelf AI is a smart inventory app built with Next.js, Supabase, and OpenAI. It helps you track household products, manage stock levels, organize categories, analyze product images, and generate recipe ideas from what is already on the shelf.
 
-## Qué Hace
+## Features
 
-- Gestiona inventario con cantidades, categorías e historial de movimientos.
-- Guarda productos en Supabase Postgres y usa Supabase Storage para imágenes.
-- Analiza fotos de productos desde la app para sugerir nombre y categoría.
-- Genera recetas contextuales a partir del inventario actual.
-- Incluye mock data para poblar una demo rápida desde el esquema SQL.
+- Smart inventory management with quantities, categories, and recent movement history
+- Supabase Postgres persistence for products and Supabase Storage for images
+- AI-assisted image analysis for suggested product names and categories
+- Recipe suggestions generated from the products currently in inventory
+- Included demo seed data so the app looks populated right after setup
 
-## Stack
+## Tech Stack
 
 - Next.js App Router
 - React
@@ -20,35 +20,35 @@ BlueShelf AI es una app de inventario inteligente construida con Next.js, Supaba
 - OpenAI API
 - ESLint
 
-## Demo Data
+## Demo Seed
 
-El archivo [supabase/schema.sql](/Users/azulramirezkuri/Documents/GitHub/inventory_tracker/supabase/schema.sql) ya incluye:
+The SQL file [supabase/schema.sql](/Users/azulramirezkuri/Documents/GitHub/inventory_tracker/supabase/schema.sql) includes:
 
-- creación de tablas
-- creación del bucket `inventory-images`
-- inserción de productos demo
-- inserción de movimientos demo
+- table creation
+- the `inventory-images` public storage bucket
+- demo inventory rows
+- demo movement history
 
-Si ejecutas ese SQL en un proyecto nuevo de Supabase, BlueShelf AI queda con datos listos para mostrar la experiencia desde el primer arranque.
+Run that SQL in a fresh Supabase project and BlueShelf AI is ready to showcase from the first launch.
 
-## Configuración
+## Local Setup
 
-### 1. Clonar el proyecto
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/AzulRK22/inventory.git
 cd inventory
 ```
 
-### 2. Instalar dependencias
+### 2. Install dependencies
 
 ```bash
 npm install
 ```
 
-### 3. Crear variables de entorno
+### 3. Create environment variables
 
-En [.env.local](/Users/azulramirezkuri/Documents/GitHub/inventory_tracker/.env.local) agrega:
+Add the following values to [.env.local](/Users/azulramirezkuri/Documents/GitHub/inventory_tracker/.env.local):
 
 ```bash
 SUPABASE_URL=your_supabase_project_url
@@ -59,60 +59,60 @@ OPENAI_MODEL=gpt-4o-mini
 OPENAI_VISION_MODEL=gpt-4o-mini
 ```
 
-### 4. Preparar Supabase
+### 4. Prepare Supabase
 
-1. Crea un proyecto en Supabase.
-2. Abre el SQL Editor.
-3. Ejecuta [supabase/schema.sql](/Users/azulramirezkuri/Documents/GitHub/inventory_tracker/supabase/schema.sql).
-4. Verifica que existan:
+1. Create a Supabase project.
+2. Open the SQL Editor.
+3. Run [supabase/schema.sql](/Users/azulramirezkuri/Documents/GitHub/inventory_tracker/supabase/schema.sql).
+4. Confirm these resources exist:
    - `inventory_items`
    - `inventory_movements`
-   - bucket `inventory-images`
+   - `inventory-images`
 
-### 5. Levantar la app
+### 5. Start the app
 
 ```bash
 npm run dev
 ```
 
-Abre `http://localhost:3000`.
+Open `http://localhost:3000`.
 
-## Flujo Principal
+## Main Flows
 
-### Inventario
+### Inventory
 
-- Crear productos con nombre, categoría e imagen.
-- Editar información del producto.
-- Incrementar o disminuir stock.
-- Eliminar productos.
+- Create products with name, category, and image
+- Edit product details
+- Increase or decrease stock
+- Delete products cleanly
 
-### Detección de Imagen
+### Image Analysis
 
-- Subir una foto o capturar desde cámara.
-- Analizar la imagen para sugerir nombre y categoría.
+- Upload a photo or capture one with the camera
+- Analyze the image to suggest a product name and category
 
-### Recetas
+### Recipes
 
-- Generar propuestas de recetas usando los productos actuales del inventario.
+- Generate recipe ideas using what is currently available in inventory
 
-## Estructura Relevante
+## Project Structure
 
-- [app/page.js](/Users/azulramirezkuri/Documents/GitHub/inventory_tracker/app/page.js) UI principal
-- [app/api/inventory/route.js](/Users/azulramirezkuri/Documents/GitHub/inventory_tracker/app/api/inventory/route.js) inventario base de lectura/alta
-- [app/api/inventory/[normalizedName]/route.js](/Users/azulramirezkuri/Documents/GitHub/inventory_tracker/app/api/inventory/[normalizedName]/route.js) actualización y eliminación
-- [app/api/vision/route.js](/Users/azulramirezkuri/Documents/GitHub/inventory_tracker/app/api/vision/route.js) detección por imagen
-- [app/api/recipes/route.js](/Users/azulramirezkuri/Documents/GitHub/inventory_tracker/app/api/recipes/route.js) recetas con OpenAI
-- [lib/server/supabase.js](/Users/azulramirezkuri/Documents/GitHub/inventory_tracker/lib/server/supabase.js) cliente server-side de Supabase
-- [lib/server/inventory-store.js](/Users/azulramirezkuri/Documents/GitHub/inventory_tracker/lib/server/inventory-store.js) lógica de persistencia
-- [supabase/schema.sql](/Users/azulramirezkuri/Documents/GitHub/inventory_tracker/supabase/schema.sql) esquema y mock data
+- [app/page.js](/Users/azulramirezkuri/Documents/GitHub/inventory_tracker/app/page.js) main dashboard UI
+- [app/api/inventory/route.js](/Users/azulramirezkuri/Documents/GitHub/inventory_tracker/app/api/inventory/route.js) inventory list and create endpoint
+- [app/api/inventory/[normalizedName]/route.js](/Users/azulramirezkuri/Documents/GitHub/inventory_tracker/app/api/inventory/[normalizedName]/route.js) item update, quantity, and delete endpoint
+- [app/api/vision/route.js](/Users/azulramirezkuri/Documents/GitHub/inventory_tracker/app/api/vision/route.js) image analysis endpoint
+- [app/api/recipes/route.js](/Users/azulramirezkuri/Documents/GitHub/inventory_tracker/app/api/recipes/route.js) recipe generation endpoint
+- [lib/server/supabase.js](/Users/azulramirezkuri/Documents/GitHub/inventory_tracker/lib/server/supabase.js) server-side Supabase client
+- [lib/server/inventory-store.js](/Users/azulramirezkuri/Documents/GitHub/inventory_tracker/lib/server/inventory-store.js) persistence layer
+- [supabase/schema.sql](/Users/azulramirezkuri/Documents/GitHub/inventory_tracker/supabase/schema.sql) schema and demo seed
 
-## Notas
+## Notes
 
-- La visión y las recetas dependen de cuota disponible en OpenAI.
-- Para entorno local, la `service role key` de Supabase debe vivir solo en `.env.local`.
-- Si quieres reiniciar la demo, puedes limpiar tablas en Supabase y volver a correr el SQL.
+- Vision and recipes depend on available OpenAI quota.
+- Keep the Supabase `service_role` key only on the server in `.env.local`.
+- To reset the demo, clear the Supabase tables and run the SQL again.
 
-## Contacto
+## Contact
 
 - Portfolio: https://www.azulrk.com
 - GitHub: https://github.com/AzulRK22

@@ -40,8 +40,8 @@ export default function Home() {
   });
 
   const searchFeedback = searchText
-    ? `${filteredInventory.length} resultado(s) para "${searchText}".`
-    : `${filteredInventory.length} producto(s) en vista.`;
+    ? `${filteredInventory.length} result(s) for "${searchText}".`
+    : `${filteredInventory.length} product(s) in view.`;
 
   const totalUnits = inventoryState.inventory.reduce(
     (total, item) => total + item.quantity,
@@ -72,47 +72,47 @@ export default function Home() {
       .filter((item) => item.quantity > 0 && item.quantity <= 2)
       .slice(0, 3)
       .map((item) => ({
-        title: `${item.name} con stock bajo`,
-        description: `Quedan ${item.quantity} unidad(es). Conviene reabastecer pronto.`,
+        title: `${item.name} is running low`,
+        description: `${item.quantity} unit(s) left. Consider restocking soon.`,
         tone: "warning",
       })),
     ...inventoryState.inventory
       .filter((item) => (movementCounts[item.normalizedName] || 0) >= 3)
       .slice(0, 2)
       .map((item) => ({
-        title: `${item.name} se mueve seguido`,
-        description: `Registró ${movementCounts[item.normalizedName]} movimientos recientes.`,
+        title: `${item.name} moves quickly`,
+        description: `${movementCounts[item.normalizedName]} recent movement(s) recorded.`,
         tone: "info",
       })),
   ].slice(0, 5);
 
   const summary = [
     {
-      label: "Productos activos",
+      label: "Active products",
       value: inventoryState.inventory.length,
-      helper: "Registros visibles en tu catalogo actual.",
+      helper: "Visible records in your current catalog.",
     },
     {
-      label: "Unidades totales",
+      label: "Total units",
       value: totalUnits,
-      helper: "Suma total de existencias disponibles.",
+      helper: "Total available stock across the catalog.",
     },
     {
-      label: "Categorias",
+      label: "Categories",
       value: totalCategories,
-      helper: "Diversidad de tu inventario organizado.",
+      helper: "How broadly your inventory is organized.",
     },
     {
-      label: "Stock bajo",
+      label: "Low stock",
       value: lowStockCount,
-      helper: "Productos que conviene revisar pronto.",
+      helper: "Products worth reviewing soon.",
     },
     {
-      label: "Mas usado",
-      value: topUsedItem?.name || "Sin dato",
+      label: "Most active",
+      value: topUsedItem?.name || "No data yet",
       helper: topUsedItem
-        ? `${movementCounts[topUsedItem.normalizedName] || 0} movimientos registrados.`
-        : "Aun no hay historial suficiente.",
+        ? `${movementCounts[topUsedItem.normalizedName] || 0} movement(s) recorded.`
+        : "There is not enough history yet.",
     },
   ];
 
@@ -179,15 +179,15 @@ export default function Home() {
                   <Stack spacing={2.25}>
                     <Box>
                       <Chip
-                        label="Panel de recetas"
+                        label="Recipe panel"
                         color="secondary"
                         variant="outlined"
                         sx={{ marginBottom: 1.5 }}
                       />
-                      <Typography variant="h2">Ideas con lo que ya tienes</Typography>
+                      <Typography variant="h2">Ideas from what you already have</Typography>
                       <Typography color="text.secondary" sx={{ marginTop: 1 }}>
-                        Convierte tu inventario en decisiones utiles. Genera sugerencias y
-                        mantenlas a la vista mientras revisas stock.
+                        Turn your inventory into useful decisions. Generate suggestions and
+                        keep them close while you review stock.
                       </Typography>
                     </Box>
                     {recipeState.recipeError && (
@@ -205,7 +205,7 @@ export default function Home() {
                       >
                         <CircularProgress size={24} />
                         <Typography color="text.secondary">
-                          Generando ideas de recetas...
+                          Generating recipe ideas...
                         </Typography>
                       </Stack>
                     ) : recipeState.recipeSuggestions.length > 0 ? (
@@ -235,12 +235,12 @@ export default function Home() {
                               >
                                 <Chip
                                   size="small"
-                                  label={`Porciones: ${recipe.servings || "2-3"}`}
+                                  label={`Servings: ${recipe.servings || "2-3"}`}
                                   variant="outlined"
                                 />
                                 <Chip
                                   size="small"
-                                  label={`Tiempo: ${recipe.time || "25 min"}`}
+                                  label={`Time: ${recipe.time || "25 min"}`}
                                   variant="outlined"
                                 />
                               </Stack>
@@ -271,13 +271,13 @@ export default function Home() {
                       >
                         <Typography variant="h6">
                           {inventoryState.inventory.length === 0
-                            ? "Aun no hay base para sugerencias"
-                            : "Tu panel de recetas esta listo"}
+                            ? "There is not enough inventory yet"
+                            : "Your recipe panel is ready"}
                         </Typography>
                         <Typography color="text.secondary" sx={{ marginTop: 1 }}>
                           {inventoryState.inventory.length === 0
-                            ? "Agrega productos para empezar a recibir recomendaciones conectadas a tu inventario."
-                            : "Usa el boton de inspiracion arriba para generar recetas con tu inventario actual."}
+                            ? "Add products to start receiving recommendations connected to your inventory."
+                            : "Use the generate button above to create recipes from your current inventory."}
                         </Typography>
                       </Box>
                     )}
@@ -290,13 +290,13 @@ export default function Home() {
                         <Stack spacing={1.5}>
                           <Box>
                             <Chip
-                              label="Alertas"
+                              label="Alerts"
                               color="primary"
                               variant="outlined"
                               sx={{ marginBottom: 1.25 }}
                             />
                             <Typography variant="h6">
-                              Señales importantes del inventario
+                              Key inventory signals
                             </Typography>
                           </Box>
                           {alerts.length > 0 ? (
@@ -314,7 +314,7 @@ export default function Home() {
                             </Stack>
                           ) : (
                             <Typography color="text.secondary">
-                              Aun no hay alertas destacadas. Tu inventario se ve estable.
+                              No highlighted alerts yet. Your inventory looks stable.
                             </Typography>
                           )}
                         </Stack>
@@ -329,18 +329,18 @@ export default function Home() {
                         <Stack spacing={1.5}>
                           <Box>
                             <Chip
-                              label="Historial"
+                              label="History"
                               color="primary"
                               variant="outlined"
                               sx={{ marginBottom: 1.25 }}
                             />
-                            <Typography variant="h6">Movimientos recientes</Typography>
+                            <Typography variant="h6">Recent activity</Typography>
                           </Box>
                           {inventoryState.movementLoading ? (
                             <Stack direction="row" spacing={1.5} alignItems="center">
                               <CircularProgress size={18} />
                               <Typography color="text.secondary">
-                                Cargando historial...
+                                Loading history...
                               </Typography>
                             </Stack>
                           ) : inventoryState.movementHistory.length > 0 ? (
@@ -369,7 +369,7 @@ export default function Home() {
                             </Stack>
                           ) : (
                             <Typography color="text.secondary">
-                              Todavia no hay movimientos registrados.
+                              No movements have been recorded yet.
                             </Typography>
                           )}
                         </Stack>

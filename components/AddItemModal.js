@@ -33,17 +33,17 @@ export default function AddItemModal({
   onSubmit,
 }) {
   const steps = [
-    { key: "details", label: "1. Datos" },
+    { key: "details", label: "1. Details" },
     {
       key: "upload",
       label:
         formState.uploadOption === "upload"
-          ? "2. Subida"
+          ? "2. Upload"
           : formState.uploadOption === "take"
-            ? "2. Camara"
-            : "2. Deteccion",
+            ? "2. Camera"
+            : "2. Detection",
     },
-    { key: "review", label: "3. Revision" },
+    { key: "review", label: "3. Review" },
   ];
 
   return (
@@ -66,16 +66,16 @@ export default function AddItemModal({
         <Stack spacing={2.5}>
           <Box>
             <Chip
-              label={editingItem ? "Edicion guiada" : "Nuevo registro"}
+              label={editingItem ? "Guided edit" : "New entry"}
               color="secondary"
               variant="outlined"
               sx={{ marginBottom: 1.5 }}
             />
             <Typography variant="h2" component="h2">
-              {editingItem ? "Actualizar producto" : "Agregar al inventario"}
+              {editingItem ? "Update product" : "Add to inventory"}
             </Typography>
             <Typography color="text.secondary" sx={{ marginTop: 1 }}>
-              Sigue este flujo para capturar datos limpios, imagen y contexto del producto.
+              Follow this flow to capture clean details, imagery, and product context.
             </Typography>
           </Box>
 
@@ -90,22 +90,22 @@ export default function AddItemModal({
           {formState.imageStatus && <Alert severity="info">{formState.imageStatus}</Alert>}
 
           <CardBlock
-            title="Paso 1. Describe el producto"
-            caption="Usa un nombre claro y una categoria coherente para mantener el inventario ordenado."
+            title="Step 1. Describe the product"
+            caption="Use a clear name and a consistent category to keep inventory organized."
           >
             <TextField
-              label="Nombre del producto"
-              placeholder="Ej. Tomate saladet"
+              label="Product name"
+              placeholder="e.g. Roma tomato"
               value={formState.itemName}
               onChange={(event) => onFormValueChange("itemName", event.target.value)}
               fullWidth
             />
 
             <FormControl fullWidth>
-              <InputLabel id="item-category-label">Categoria</InputLabel>
+              <InputLabel id="item-category-label">Category</InputLabel>
               <Select
                 labelId="item-category-label"
-                label="Categoria"
+                label="Category"
                 value={formState.itemCategory}
                 onChange={(event) => onFormValueChange("itemCategory", event.target.value)}
               >
@@ -119,33 +119,33 @@ export default function AddItemModal({
           </CardBlock>
 
           <CardBlock
-            title="Paso 2. Agrega una imagen"
-            caption="Elige el método que mejor se adapte al momento: archivo, camara o deteccion."
+            title="Step 2. Add an image"
+            caption="Choose the method that fits the moment best: upload, camera, or detection."
           >
             <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap>
               <Button
                 variant={formState.uploadOption === "upload" ? "contained" : "outlined"}
                 onClick={() => onFormValueChange("uploadOption", "upload")}
               >
-                Subir imagen
+                Upload image
               </Button>
               <Button
                 variant={formState.uploadOption === "take" ? "contained" : "outlined"}
                 onClick={() => onFormValueChange("uploadOption", "take")}
               >
-                Usar camara
+                Use camera
               </Button>
               <Button
                 variant={formState.uploadOption === "auto" ? "contained" : "outlined"}
                 onClick={() => onFormValueChange("uploadOption", "auto")}
               >
-                Detectar desde imagen
+                Detect from image
               </Button>
             </Stack>
 
             {formState.uploadOption === "upload" && (
               <Button variant="outlined" component="label" sx={{ alignSelf: "flex-start" }}>
-                Elegir archivo
+                Choose file
                 <input hidden type="file" accept="image/*" onChange={onImageChange} />
               </Button>
             )}
@@ -175,7 +175,7 @@ export default function AddItemModal({
                   disabled={formState.detectLoading}
                   sx={{ alignSelf: "flex-start" }}
                 >
-                  Capturar imagen
+                  Capture image
                 </Button>
               </Stack>
             )}
@@ -183,12 +183,12 @@ export default function AddItemModal({
             {formState.uploadOption === "auto" && (
               <Stack spacing={1.5}>
                 <Button variant="outlined" component="label" sx={{ alignSelf: "flex-start" }}>
-                  Seleccionar imagen para detectar
+                  Select image for detection
                   <input hidden type="file" accept="image/*" onChange={onImageChange} />
                 </Button>
                 <Typography color="text.secondary">
                   {formState.detectedName ||
-                    "Primero sube o captura una imagen y luego usa la deteccion automatica."}
+                    "Upload or capture an image first, then run auto detection."}
                 </Typography>
                 {formState.detectionSuggestions?.length > 0 && (
                   <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
@@ -209,7 +209,7 @@ export default function AddItemModal({
                 )}
                 {formState.suggestedCategory && (
                   <Chip
-                    label={`Categoria sugerida: ${formState.suggestedCategory}`}
+                    label={`Suggested category: ${formState.suggestedCategory}`}
                     color="secondary"
                     variant="outlined"
                     sx={{ alignSelf: "flex-start" }}
@@ -221,25 +221,25 @@ export default function AddItemModal({
                   disabled={!formState.itemImage || formState.detectLoading}
                   sx={{ alignSelf: "flex-start" }}
                 >
-                  {formState.detectLoading ? "Detectando..." : "Analizar imagen"}
+                  {formState.detectLoading ? "Detecting..." : "Analyze image"}
                 </Button>
               </Stack>
             )}
           </CardBlock>
 
           <CardBlock
-            title="Paso 3. Revisa antes de guardar"
-            caption="Confirma que el nombre, la categoria y la imagen comuniquen claramente el producto."
+            title="Step 3. Review before saving"
+            caption="Confirm that the name, category, and image clearly represent the product."
           >
             <Stack spacing={1.25}>
               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                 <Chip
-                  label={formState.itemName ? `Nombre: ${formState.itemName}` : "Nombre pendiente"}
+                  label={formState.itemName ? `Name: ${formState.itemName}` : "Name pending"}
                   variant="outlined"
                 />
-                <Chip label={`Categoria: ${formState.itemCategory}`} variant="outlined" />
+                <Chip label={`Category: ${formState.itemCategory}`} variant="outlined" />
                 {formState.detectedName && (
-                  <Chip label={`Deteccion: ${formState.detectedName}`} variant="outlined" />
+                  <Chip label={`Detection: ${formState.detectedName}`} variant="outlined" />
                 )}
               </Stack>
 
@@ -254,7 +254,7 @@ export default function AddItemModal({
                 >
                   <Image
                     src={formState.imagePreview}
-                    alt="Vista previa"
+                    alt="Preview"
                     width={1200}
                     height={900}
                     unoptimized
@@ -270,7 +270,7 @@ export default function AddItemModal({
                   }}
                 >
                   <Typography color="text.secondary">
-                    Aun no has agregado una imagen para este producto.
+                    You have not added an image for this product yet.
                   </Typography>
                 </Box>
               )}
@@ -280,7 +280,7 @@ export default function AddItemModal({
           <Divider />
           <Stack direction="row" spacing={2} justifyContent="flex-end">
             <Button variant="outlined" onClick={onClose}>
-              Cancelar
+              Cancel
             </Button>
             <Button
               variant="contained"
@@ -288,10 +288,10 @@ export default function AddItemModal({
               disabled={formState.submitLoading}
             >
               {formState.submitLoading
-                ? "Guardando..."
+                ? "Saving..."
                 : editingItem
-                  ? "Guardar cambios"
-                  : "Guardar producto"}
+                  ? "Save changes"
+                  : "Save product"}
             </Button>
           </Stack>
         </Stack>

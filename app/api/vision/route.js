@@ -10,14 +10,14 @@ export async function POST(request) {
 
     if (!imageBase64) {
       return NextResponse.json(
-        { error: "La imagen es obligatoria para detectar el producto." },
+        { error: "An image is required to detect a product." },
         { status: 400 }
       );
     }
 
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json(
-        { error: "Falta configurar OPENAI_API_KEY en el servidor." },
+        { error: "OPENAI_API_KEY is missing on the server." },
         { status: 500 }
       );
     }
@@ -34,16 +34,16 @@ export async function POST(request) {
       messages: [
         {
           role: "system",
-          content: `Analiza fotos de productos para inventario. Responde solo con JSON valido que incluya suggestedName, suggestedCategory y suggestions. suggestedCategory debe ser una de: ${CATEGORY_OPTIONS.join(
+          content: `Analyze product photos for inventory management. Reply only with valid JSON including suggestedName, suggestedCategory, and suggestions. suggestedCategory must be one of: ${CATEGORY_OPTIONS.join(
             ", "
-          )}. suggestions debe ser un arreglo corto de nombres posibles en español.`,
+          )}. suggestions must be a short array of plausible product names in English.`,
         },
         {
           role: "user",
           content: [
             {
               type: "text",
-              text: "Identifica el producto principal de esta imagen para registrarlo en un inventario de hogar.",
+              text: "Identify the main product in this image so it can be saved to a household inventory.",
             },
             {
               type: "image_url",
@@ -72,7 +72,7 @@ export async function POST(request) {
 
     return NextResponse.json({
       detectedName:
-        parsed.suggestedName || fallbackDetection.suggestedName || "No se pudo detectar el nombre.",
+        parsed.suggestedName || fallbackDetection.suggestedName || "The product name could not be detected.",
       suggestedName: parsed.suggestedName || fallbackDetection.suggestedName,
       suggestedCategory:
         parsed.suggestedCategory ||
@@ -87,7 +87,7 @@ export async function POST(request) {
   } catch (error) {
     console.error("Vision replacement API error:", error);
     return NextResponse.json(
-      { error: error?.message || "No se pudo procesar la imagen." },
+      { error: error?.message || "The image could not be processed." },
       { status: 500 }
     );
   }

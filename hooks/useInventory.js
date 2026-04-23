@@ -23,7 +23,7 @@ async function requestInventory(url, options = {}) {
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data.error || "No se pudo completar la operacion.");
+    throw new Error(data.error || "The operation could not be completed.");
   }
 
   return data;
@@ -55,7 +55,7 @@ export function useInventory() {
       setMovementHistory(data.movementHistory || []);
     } catch (error) {
       console.error("Error updating inventory:", error);
-      setInventoryError("No se pudo cargar el inventario.");
+      setInventoryError("Inventory could not be loaded.");
     } finally {
       setInventoryLoading(false);
       setMovementLoading(false);
@@ -113,7 +113,7 @@ export function useInventory() {
       imagePreview: previewSource,
       imageError: "",
       formError: "",
-      imageStatus: "Imagen lista para guardar.",
+      imageStatus: "Image ready to save.",
       detectionSuggestions: [],
       suggestedCategory: "",
     }));
@@ -142,7 +142,7 @@ export function useInventory() {
     const imageSrc = webcamRef.current.getScreenshot();
 
     if (!imageSrc) {
-      setFormValue("imageError", "No se pudo capturar la imagen.");
+      setFormValue("imageError", "The image could not be captured.");
       return;
     }
 
@@ -168,7 +168,7 @@ export function useInventory() {
       }),
     });
 
-    setInventoryStatus(`"${toDisplayName(itemName)}" se agrego al inventario.`);
+    setInventoryStatus(`"${toDisplayName(itemName)}" was added to inventory.`);
   }, []);
 
   const updateItem = useCallback(
@@ -193,7 +193,7 @@ export function useInventory() {
         }),
       });
 
-      setInventoryStatus(`"${toDisplayName(itemName)}" se actualizo correctamente.`);
+      setInventoryStatus(`"${toDisplayName(itemName)}" was updated successfully.`);
     },
     [editingItem]
   );
@@ -205,7 +205,7 @@ export function useInventory() {
     );
 
     if (!normalizedName) {
-      setFormValue("formError", "El nombre del producto no puede estar vacio.");
+      setFormValue("formError", "Product name cannot be empty.");
       return;
     }
 
@@ -214,7 +214,7 @@ export function useInventory() {
       normalizedName !== editingItem?.normalizedName;
 
     if (duplicateExists) {
-      setFormValue("formError", "Ese producto ya existe en el inventario.");
+      setFormValue("formError", "That product already exists in inventory.");
       return;
     }
 
@@ -246,10 +246,7 @@ export function useInventory() {
       closeModal();
     } catch (error) {
       console.error("Error saving item:", error);
-      setFormValue(
-        "formError",
-        error.message || "No se pudo guardar el producto."
-      );
+      setFormValue("formError", error.message || "The product could not be saved.");
     } finally {
       setFormState((current) => ({
         ...current,
@@ -276,11 +273,11 @@ export function useInventory() {
         });
         const nextQuantity = data.item?.quantity ?? item.quantity;
 
-        setInventoryStatus(`Cantidad de "${item.name}" actualizada a ${nextQuantity}.`);
+        setInventoryStatus(`"${item.name}" quantity updated to ${nextQuantity}.`);
         await updateInventory();
       } catch (error) {
         console.error("Error changing quantity:", error);
-        setInventoryError("No se pudo actualizar la cantidad.");
+        setInventoryError("Quantity could not be updated.");
       }
     },
     [updateInventory]
@@ -293,11 +290,11 @@ export function useInventory() {
           method: "DELETE",
         });
 
-        setInventoryStatus(`"${item.name}" se elimino del inventario.`);
+        setInventoryStatus(`"${item.name}" was removed from inventory.`);
         await updateInventory();
       } catch (error) {
         console.error("Error deleting item:", error);
-        setInventoryError("No se pudo eliminar el producto.");
+        setInventoryError("The product could not be deleted.");
       }
     },
     [updateInventory]
@@ -308,8 +305,8 @@ export function useInventory() {
       if (!formState.itemImage) {
         setFormState((current) => ({
           ...current,
-          formError: "Sube o captura una imagen antes de detectar el producto.",
-          imageError: "Falta una imagen para analizar.",
+          formError: "Upload or capture an image before detecting a product.",
+          imageError: "An image is required for analysis.",
         }));
         return;
       }
@@ -319,7 +316,7 @@ export function useInventory() {
         detectLoading: true,
         imageError: "",
         formError: "",
-        imageStatus: "Analizando imagen...",
+        imageStatus: "Analyzing image...",
       }));
 
       const detection = await detectItemFromImage(formState.itemImage);
@@ -337,13 +334,13 @@ export function useInventory() {
           current.itemCategory === "Other" && detection.suggestedCategory
             ? detection.suggestedCategory
             : current.itemCategory,
-        imageStatus: "Imagen analizada correctamente.",
+        imageStatus: "Image analyzed successfully.",
       }));
     } catch (error) {
       console.error("Error detecting item:", error);
       setFormState((current) => ({
         ...current,
-        imageError: error.message || "No se pudo detectar el producto.",
+        imageError: error.message || "The product could not be detected.",
         imageStatus: "",
       }));
     } finally {
