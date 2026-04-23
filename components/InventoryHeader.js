@@ -71,7 +71,7 @@ export default function InventoryHeader({
             }}
           />
           <Typography variant="h1" component="h1" sx={{ maxWidth: 560 }}>
-            Azul&apos;s Shop
+            BlueShelf AI
           </Typography>
           <Typography
             variant="body1"
@@ -82,8 +82,8 @@ export default function InventoryHeader({
             }}
           >
             Gestiona tu inventario como un producto real: existencias claras,
-            categorias ordenadas, recetas contextualizadas y acciones rapidas
-            desde cualquier pantalla.
+            categorias ordenadas, vision asistida, recetas contextualizadas y
+            acciones rapidas desde cualquier pantalla.
           </Typography>
         </Box>
         <Stack

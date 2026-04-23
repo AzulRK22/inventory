@@ -1,8 +1,8 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Azul's Shop",
-  description: "Gestiona tu inventario de despensa y productos.",
+  title: "BlueShelf AI",
+  description: "Inventario inteligente con Supabase, visión asistida y recetas generadas con IA.",
 };
 
 export default function RootLayout({ children }) {
