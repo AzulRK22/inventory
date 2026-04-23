@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import {
   Box,
@@ -7,7 +8,10 @@ import {
   CardActions,
   CardContent,
   Chip,
+  CircularProgress,
   IconButton,
+  Menu,
+  MenuItem,
   Stack,
   Tooltip,
   Typography,
@@ -16,17 +20,46 @@ import {
   Add as AddIcon,
   DeleteOutline as DeleteIcon,
   EditOutlined as EditIcon,
+  MoreVert as MoreVertIcon,
   Remove as RemoveIcon,
 } from "@mui/icons-material";
-import { formatUpdatedAt } from "@/lib/inventory";
+import { formatUpdatedAt, getUpdatedAtValue } from "@/lib/inventory";
 
 export default function InventoryCard({
   item,
+  mutationState,
   onIncrement,
   onDecrement,
   onEdit,
   onDelete,
 }) {
+  const [menuAnchorEl, setMenuAnchorEl] = useState(null);
+  const isMenuOpen = Boolean(menuAnchorEl);
+  const isLowStock = item.quantity > 0 && item.quantity <= 2;
+  const isRecentlyUpdated =
+    Date.now() - getUpdatedAtValue(item.updatedAt) <= 1000 * 60 * 60 * 24;
+  const isQuantityUpdating = Boolean(mutationState?.quantity);
+  const isDeletePending = Boolean(mutationState?.delete);
+  const isBusy = isQuantityUpdating || isDeletePending;
+
+  const openMenu = (event) => {
+    setMenuAnchorEl(event.currentTarget);
+  };
+
+  const closeMenu = () => {
+    setMenuAnchorEl(null);
+  };
+
+  const handleEdit = () => {
+    closeMenu();
+    onEdit(item);
+  };
+
+  const handleDelete = () => {
+    closeMenu();
+    onDelete(item);
+  };
+
   return (
     <Card
       sx={{
@@ -92,14 +125,15 @@ export default function InventoryCard({
             <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
               <Chip
                 size="small"
-                label={`Key: ${item.normalizedName}`}
-                variant="outlined"
-              />
-              <Chip
-                size="small"
                 label={`Updated ${formatUpdatedAt(item.updatedAt)}`}
                 variant="outlined"
               />
+              {isLowStock && (
+                <Chip size="small" label="Low stock" color="warning" />
+              )}
+              {isRecentlyUpdated && (
+                <Chip size="small" label="Recently updated" color="secondary" variant="outlined" />
+              )}
             </Stack>
           </Stack>
 
@@ -122,16 +156,32 @@ export default function InventoryCard({
                 <Typography variant="overline" color="text.secondary">
                   Quantity on hand
                 </Typography>
-                <Typography variant="h3">{item.quantity}</Typography>
+              <Typography variant="h3">{item.quantity}</Typography>
               </Box>
               <Typography
                 variant="body2"
                 color="text.secondary"
-                sx={{ maxWidth: 120, textAlign: "right" }}
+                sx={{ maxWidth: 150, textAlign: "right" }}
               >
-                Adjust stock, edit details, or remove it here
+                Category: {item.category}
               </Typography>
             </Stack>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ marginTop: 1, textAlign: "right" }}
+            >
+              Last updated {formatUpdatedAt(item.updatedAt)}
+            </Typography>
+            {isLowStock && (
+              <Typography
+                variant="body2"
+                color="warning.main"
+                sx={{ marginTop: 0.75, textAlign: "right", fontWeight: 600 }}
+              >
+                Reorder soon to avoid running out.
+              </Typography>
+            )}
           </Box>
         </Stack>
       </CardContent>
@@ -150,10 +200,10 @@ export default function InventoryCard({
               <IconButton
                 color="primary"
                 onClick={() => onDecrement(item)}
-                disabled={item.quantity <= 0}
+                disabled={item.quantity <= 0 || isBusy}
                 sx={{ backgroundColor: "rgba(49, 92, 74, 0.08)" }}
               >
-                <RemoveIcon />
+                {isQuantityUpdating ? <CircularProgress size={18} /> : <RemoveIcon />}
               </IconButton>
             </span>
           </Tooltip>
@@ -161,34 +211,36 @@ export default function InventoryCard({
             <IconButton
               color="primary"
               onClick={() => onIncrement(item)}
+              disabled={isBusy}
               sx={{ backgroundColor: "rgba(49, 92, 74, 0.08)" }}
             >
-              <AddIcon />
+              {isQuantityUpdating ? <CircularProgress size={18} /> : <AddIcon />}
             </IconButton>
           </Tooltip>
         </Stack>
 
-        <Stack direction="row" spacing={1}>
-          <Tooltip title="Edit product">
-            <IconButton
-              color="primary"
-              onClick={() => onEdit(item)}
-              sx={{ backgroundColor: "rgba(49, 92, 74, 0.08)" }}
-            >
-              <EditIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Delete product">
-            <IconButton
-              color="secondary"
-              onClick={() => onDelete(item)}
-              sx={{ backgroundColor: "rgba(199, 106, 74, 0.1)" }}
-            >
-              <DeleteIcon />
-            </IconButton>
-          </Tooltip>
-        </Stack>
+        <Tooltip title="More actions">
+          <IconButton
+            color="primary"
+            onClick={openMenu}
+            disabled={isBusy}
+            sx={{ backgroundColor: "rgba(49, 92, 74, 0.08)" }}
+          >
+            {isDeletePending ? <CircularProgress size={18} /> : <MoreVertIcon />}
+          </IconButton>
+        </Tooltip>
       </CardActions>
+
+      <Menu anchorEl={menuAnchorEl} open={isMenuOpen} onClose={closeMenu}>
+        <MenuItem onClick={handleEdit}>
+          <EditIcon fontSize="small" style={{ marginRight: 10 }} />
+          Edit product
+        </MenuItem>
+        <MenuItem onClick={handleDelete} sx={{ color: "secondary.main" }}>
+          <DeleteIcon fontSize="small" style={{ marginRight: 10 }} />
+          Delete product
+        </MenuItem>
+      </Menu>
     </Card>
   );
 }

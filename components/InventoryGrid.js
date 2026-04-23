@@ -15,6 +15,7 @@ export default function InventoryGrid({
   inventory,
   filteredInventory,
   inventoryLoading,
+  itemMutationState,
   onIncrement,
   onDecrement,
   onEdit,
@@ -65,6 +66,7 @@ export default function InventoryGrid({
           <Grid item xs={12} sm={6} xl={4} key={item.normalizedName}>
             <InventoryCard
               item={item}
+              mutationState={itemMutationState[item.normalizedName] || {}}
               onIncrement={onIncrement}
               onDecrement={onDecrement}
               onEdit={onEdit}

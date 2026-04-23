@@ -36,8 +36,10 @@ export function useInventory() {
   const [movementLoading, setMovementLoading] = useState(true);
   const [inventoryError, setInventoryError] = useState("");
   const [inventoryStatus, setInventoryStatus] = useState("");
+  const [itemMutationState, setItemMutationState] = useState({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [pendingDeleteItem, setPendingDeleteItem] = useState(null);
   const [formState, setFormState] = useState(createEmptyFormState);
   const webcamRef = useRef(null);
 
@@ -65,6 +67,19 @@ export function useInventory() {
   useEffect(() => {
     updateInventory();
   }, [updateInventory]);
+
+  useEffect(() => {
+    if (!inventoryStatus && !inventoryError) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setInventoryStatus("");
+      setInventoryError("");
+    }, 4000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [inventoryStatus, inventoryError]);
 
   const resetFormState = useCallback(() => {
     setFormState(createEmptyFormState());
@@ -114,8 +129,10 @@ export function useInventory() {
       imageError: "",
       formError: "",
       imageStatus: "Image ready to save.",
+      detectedName: "",
       detectionSuggestions: [],
       suggestedCategory: "",
+      detectionDismissed: false,
     }));
   }, []);
 
@@ -266,6 +283,14 @@ export function useInventory() {
 
   const changeItemQuantity = useCallback(
     async (item, delta) => {
+      setItemMutationState((current) => ({
+        ...current,
+        [item.normalizedName]: {
+          ...(current[item.normalizedName] || {}),
+          quantity: true,
+        },
+      }));
+
       try {
         const data = await requestInventory(`/api/inventory/${item.normalizedName}`, {
           method: "PATCH",
@@ -278,27 +303,61 @@ export function useInventory() {
       } catch (error) {
         console.error("Error changing quantity:", error);
         setInventoryError("Quantity could not be updated.");
+      } finally {
+        setItemMutationState((current) => ({
+          ...current,
+          [item.normalizedName]: {
+            ...(current[item.normalizedName] || {}),
+            quantity: false,
+          },
+        }));
       }
     },
     [updateInventory]
   );
 
-  const deleteItem = useCallback(
-    async (item) => {
-      try {
-        await requestInventory(`/api/inventory/${item.normalizedName}`, {
-          method: "DELETE",
-        });
+  const requestDeleteItem = useCallback((item) => {
+    setPendingDeleteItem(item);
+  }, []);
 
-        setInventoryStatus(`"${item.name}" was removed from inventory.`);
-        await updateInventory();
-      } catch (error) {
-        console.error("Error deleting item:", error);
-        setInventoryError("The product could not be deleted.");
-      }
-    },
-    [updateInventory]
-  );
+  const cancelDeleteItem = useCallback(() => {
+    setPendingDeleteItem(null);
+  }, []);
+
+  const confirmDeleteItem = useCallback(async () => {
+    if (!pendingDeleteItem) {
+      return;
+    }
+
+    setItemMutationState((current) => ({
+      ...current,
+      [pendingDeleteItem.normalizedName]: {
+        ...(current[pendingDeleteItem.normalizedName] || {}),
+        delete: true,
+      },
+    }));
+
+    try {
+      await requestInventory(`/api/inventory/${pendingDeleteItem.normalizedName}`, {
+        method: "DELETE",
+      });
+
+      setInventoryStatus(`"${pendingDeleteItem.name}" was removed from inventory.`);
+      setPendingDeleteItem(null);
+      await updateInventory();
+    } catch (error) {
+      console.error("Error deleting item:", error);
+      setInventoryError("The product could not be deleted.");
+    } finally {
+      setItemMutationState((current) => ({
+        ...current,
+        [pendingDeleteItem.normalizedName]: {
+          ...(current[pendingDeleteItem.normalizedName] || {}),
+          delete: false,
+        },
+      }));
+    }
+  }, [pendingDeleteItem, updateInventory]);
 
   const handleAutoDetect = useCallback(async () => {
     try {
@@ -326,15 +385,8 @@ export function useInventory() {
         detectedName: detection.suggestedName || detection.detectedName || "",
         detectionSuggestions: detection.suggestions || [],
         suggestedCategory: detection.suggestedCategory || "",
-        itemName:
-          !current.itemName && (detection.suggestedName || detection.detectedName)
-            ? detection.suggestedName || detection.detectedName
-            : current.itemName,
-        itemCategory:
-          current.itemCategory === "Other" && detection.suggestedCategory
-            ? detection.suggestedCategory
-            : current.itemCategory,
         imageStatus: "Image analyzed successfully.",
+        detectionDismissed: false,
       }));
     } catch (error) {
       console.error("Error detecting item:", error);
@@ -351,15 +403,46 @@ export function useInventory() {
     }
   }, [formState.itemImage]);
 
-  const applyDetectionSuggestion = useCallback((suggestion) => {
+  const applyDetectionName = useCallback(() => {
     setFormState((current) => ({
       ...current,
-      itemName: suggestion,
-      itemCategory:
-        current.suggestedCategory && current.itemCategory === "Other"
-          ? current.suggestedCategory
-          : current.itemCategory,
+      itemName:
+        current.detectedName ||
+        current.detectionSuggestions?.[0] ||
+        current.itemName,
       formError: "",
+      imageStatus: "AI suggested name applied to the form.",
+    }));
+  }, []);
+
+  const applyDetectionCategory = useCallback(() => {
+    setFormState((current) => ({
+      ...current,
+      itemCategory: current.suggestedCategory || current.itemCategory,
+      formError: "",
+      imageStatus: "AI suggested category applied to the form.",
+    }));
+  }, []);
+
+  const applyDetectionSuggestion = useCallback(() => {
+    setFormState((current) => ({
+      ...current,
+      itemName:
+        current.detectedName ||
+        current.detectionSuggestions?.[0] ||
+        current.itemName,
+      itemCategory: current.suggestedCategory || current.itemCategory,
+      formError: "",
+      imageStatus: "AI result applied to the form.",
+      detectionDismissed: true,
+    }));
+  }, []);
+
+  const dismissDetectionSuggestion = useCallback(() => {
+    setFormState((current) => ({
+      ...current,
+      detectionDismissed: true,
+      imageStatus: "AI suggestion reviewed. Keeping your current values.",
     }));
   }, []);
 
@@ -370,8 +453,10 @@ export function useInventory() {
     movementLoading,
     inventoryError,
     inventoryStatus,
+    itemMutationState,
     isModalOpen,
     editingItem,
+    pendingDeleteItem,
     formState,
     webcamRef,
     updateInventory,
@@ -379,12 +464,17 @@ export function useInventory() {
     openEditModal,
     closeModal,
     setFormValue,
+    applyDetectionName,
+    applyDetectionCategory,
     applyDetectionSuggestion,
+    dismissDetectionSuggestion,
     handleImageChange,
     handleCapture,
     handleSubmit,
     handleAutoDetect,
     changeItemQuantity,
-    deleteItem,
+    requestDeleteItem,
+    cancelDeleteItem,
+    confirmDeleteItem,
   };
 }

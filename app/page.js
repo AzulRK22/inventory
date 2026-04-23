@@ -4,10 +4,17 @@ import { useState } from "react";
 import {
   Alert,
   Box,
+  Button,
   Card,
   CardContent,
   Chip,
   CircularProgress,
+  Snackbar,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   Grid,
   Stack,
   ThemeProvider,
@@ -40,8 +47,12 @@ export default function Home() {
   });
 
   const searchFeedback = searchText
-    ? `${filteredInventory.length} result(s) for "${searchText}".`
-    : `${filteredInventory.length} product(s) in view.`;
+    ? `${filteredInventory.length} ${
+        filteredInventory.length === 1 ? "result" : "results"
+      } for "${searchText}"`
+    : `${filteredInventory.length} ${
+        filteredInventory.length === 1 ? "product" : "products"
+      } in view`;
 
   const totalUnits = inventoryState.inventory.reduce(
     (total, item) => total + item.quantity,
@@ -115,6 +126,10 @@ export default function Home() {
         : "There is not enough history yet.",
     },
   ];
+  const recipePanelActive =
+    recipeState.recipeLoading ||
+    recipeState.recipeSuggestions.length > 0 ||
+    Boolean(recipeState.recipeError);
 
   return (
     <ThemeProvider theme={appTheme}>
@@ -146,23 +161,17 @@ export default function Home() {
             summary={summary}
           />
 
-          {inventoryState.inventoryStatus && (
-            <Alert severity="success">{inventoryState.inventoryStatus}</Alert>
-          )}
-          {inventoryState.inventoryError && (
-            <Alert severity="error">{inventoryState.inventoryError}</Alert>
-          )}
-
           <Grid container spacing={{ xs: 2, md: 2.5 }} alignItems="start">
             <Grid item xs={12} lg={8.5}>
               <InventoryGrid
                 inventory={inventoryState.inventory}
                 filteredInventory={filteredInventory}
                 inventoryLoading={inventoryState.inventoryLoading}
+                itemMutationState={inventoryState.itemMutationState}
                 onIncrement={(item) => inventoryState.changeItemQuantity(item, 1)}
                 onDecrement={(item) => inventoryState.changeItemQuantity(item, -1)}
                 onEdit={inventoryState.openEditModal}
-                onDelete={inventoryState.deleteItem}
+                onDelete={inventoryState.requestDeleteItem}
               />
             </Grid>
             <Grid item xs={12} lg={3.5}>
@@ -171,8 +180,16 @@ export default function Home() {
                 sx={{
                   position: { lg: "sticky" },
                   top: { lg: 24 },
-                  backgroundColor: "rgba(255, 250, 242, 0.84)",
+                  background: recipePanelActive
+                    ? "linear-gradient(180deg, rgba(255, 250, 242, 0.92), rgba(248, 241, 231, 0.88))"
+                    : "linear-gradient(180deg, rgba(255, 252, 247, 0.74), rgba(249, 244, 236, 0.62))",
+                  borderColor: recipePanelActive
+                    ? "rgba(199, 106, 74, 0.18)"
+                    : "rgba(49, 92, 74, 0.08)",
                   backdropFilter: "blur(14px)",
+                  boxShadow: recipePanelActive
+                    ? "0 18px 42px rgba(199, 106, 74, 0.08)"
+                    : "none",
                 }}
               >
                 <CardContent>
@@ -180,12 +197,18 @@ export default function Home() {
                     <Box>
                       <Chip
                         label="Recipe panel"
-                        color="secondary"
-                        variant="outlined"
+                        color={recipePanelActive ? "secondary" : "default"}
+                        variant={recipePanelActive ? "outlined" : "filled"}
                         sx={{ marginBottom: 1.5 }}
                       />
                       <Typography variant="h2">Ideas from what you already have</Typography>
-                      <Typography color="text.secondary" sx={{ marginTop: 1 }}>
+                      <Typography
+                        color="text.secondary"
+                        sx={{
+                          marginTop: 1,
+                          opacity: recipePanelActive ? 1 : 0.78,
+                        }}
+                      >
                         Turn your inventory into useful decisions. Generate suggestions and
                         keep them close while you review stock.
                       </Typography>
@@ -392,9 +415,58 @@ export default function Home() {
           onImageChange={inventoryState.handleImageChange}
           onCapture={inventoryState.handleCapture}
           onAutoDetect={inventoryState.handleAutoDetect}
+          onApplyDetectionName={inventoryState.applyDetectionName}
+          onApplyDetectionCategory={inventoryState.applyDetectionCategory}
           onApplyDetectionSuggestion={inventoryState.applyDetectionSuggestion}
+          onDismissDetectionSuggestion={inventoryState.dismissDetectionSuggestion}
           onSubmit={inventoryState.handleSubmit}
         />
+
+        <Dialog
+          open={Boolean(inventoryState.pendingDeleteItem)}
+          onClose={inventoryState.cancelDeleteItem}
+        >
+          <DialogTitle>Delete product?</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              {inventoryState.pendingDeleteItem
+                ? `This will permanently remove "${inventoryState.pendingDeleteItem.name}" from inventory and add a delete movement to the history.`
+                : "This will permanently remove the product from inventory."}
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button variant="outlined" onClick={inventoryState.cancelDeleteItem}>
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              color="secondary"
+              onClick={inventoryState.confirmDeleteItem}
+            >
+              Delete product
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Snackbar
+          open={Boolean(inventoryState.inventoryStatus)}
+          autoHideDuration={4000}
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        >
+          <Alert severity="success" variant="filled" sx={{ width: "100%" }}>
+            {inventoryState.inventoryStatus}
+          </Alert>
+        </Snackbar>
+
+        <Snackbar
+          open={Boolean(inventoryState.inventoryError)}
+          autoHideDuration={4000}
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        >
+          <Alert severity="error" variant="filled" sx={{ width: "100%" }}>
+            {inventoryState.inventoryError}
+          </Alert>
+        </Snackbar>
       </Box>
     </ThemeProvider>
   );
