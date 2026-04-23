@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint . --ext .js,.jsx --max-warnings=0"
+    "lint": "eslint . --ext .js,.jsx --max-warnings=0",
+    "test": "node --experimental-default-type=module --test tests/*.test.js"
   },
   "dependencies": {
     "@emotion/react": "^11.13.0",
