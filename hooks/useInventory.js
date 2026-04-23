@@ -1,31 +1,33 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { firestore, storage } from "@/firebase";
 import { detectItemFromImage } from "@/lib/ai";
 import {
-  buildItemPayload,
   createEditFormState,
   createEmptyFormState,
-  mapInventoryDoc,
-  mapMovementDoc,
   normalizeItemName,
   suggestCategoryFromText,
   toDisplayName,
   validateImageFile,
 } from "@/lib/inventory";
-import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  getDocs,
-  query,
-  runTransaction,
-  serverTimestamp,
-  setDoc,
-} from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+
+async function requestInventory(url, options = {}) {
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    },
+    cache: options.cache || "no-store",
+  });
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "No se pudo completar la operacion.");
+  }
+
+  return data;
+}
 
 export function useInventory() {
   const [inventory, setInventory] = useState([]);
@@ -45,28 +47,12 @@ export function useInventory() {
       setMovementLoading(true);
       setInventoryError("");
 
-      const [inventorySnapshot, movementSnapshot] = await Promise.all([
-        getDocs(query(collection(firestore, "inventory"))),
-        getDocs(query(collection(firestore, "inventory_movements"))),
-      ]);
+      const data = await requestInventory("/api/inventory", {
+        method: "GET",
+      });
 
-      setInventory(inventorySnapshot.docs.map(mapInventoryDoc));
-      setMovementHistory(
-        movementSnapshot.docs
-          .map(mapMovementDoc)
-          .sort((left, right) => {
-            const leftValue =
-              typeof left.createdAt?.toMillis === "function"
-                ? left.createdAt.toMillis()
-                : 0;
-            const rightValue =
-              typeof right.createdAt?.toMillis === "function"
-                ? right.createdAt.toMillis()
-                : 0;
-            return rightValue - leftValue;
-          })
-          .slice(0, 40)
-      );
+      setInventory(data.inventory || []);
+      setMovementHistory(data.movementHistory || []);
     } catch (error) {
       console.error("Error updating inventory:", error);
       setInventoryError("No se pudo cargar el inventario.");
@@ -79,13 +65,6 @@ export function useInventory() {
   useEffect(() => {
     updateInventory();
   }, [updateInventory]);
-
-  const recordMovement = useCallback(async (movement) => {
-    await addDoc(collection(firestore, "inventory_movements"), {
-      ...movement,
-      createdAt: serverTimestamp(),
-    });
-  }, []);
 
   const resetFormState = useCallback(() => {
     setFormState(createEmptyFormState());
@@ -177,111 +156,46 @@ export function useInventory() {
     setFormValue("capturing", false);
   }, [handleImageSelection, setFormValue]);
 
-  const uploadItemImage = useCallback(
-    async (normalizedName, imageFile) => {
-      if (!imageFile) {
-        return editingItem?.imageUrl || "";
-      }
+  const createItem = useCallback(async ({ itemName, itemCategory, imagePreview }) => {
+    const resolvedCategory = itemCategory || suggestCategoryFromText(itemName);
 
-      const imageRef = ref(storage, `inventory/${normalizedName}`);
-      await uploadBytes(imageRef, imageFile);
-      return getDownloadURL(imageRef);
-    },
-    [editingItem]
-  );
+    await requestInventory("/api/inventory", {
+      method: "POST",
+      body: JSON.stringify({
+        itemName,
+        itemCategory: resolvedCategory,
+        imageDataUrl: imagePreview || "",
+      }),
+    });
 
-  const createItem = useCallback(
-    async ({ itemName, itemCategory, itemImage }) => {
-      const normalizedName = normalizeItemName(itemName);
-      const imageUrl = await uploadItemImage(normalizedName, itemImage);
-      const resolvedCategory = itemCategory || suggestCategoryFromText(itemName);
-      const docRef = doc(collection(firestore, "inventory"), normalizedName);
-
-      await setDoc(
-        docRef,
-        buildItemPayload({
-          itemName,
-          normalizedName,
-          category: resolvedCategory,
-          quantity: 1,
-          imageUrl,
-        }),
-        { merge: true }
-      );
-
-      await recordMovement({
-        itemName: toDisplayName(itemName),
-        normalizedName,
-        action: "created",
-        quantityChange: 1,
-        quantityAfter: 1,
-        category: resolvedCategory,
-        note: "Producto agregado al inventario.",
-      });
-
-      setInventoryStatus(`"${toDisplayName(itemName)}" se agrego al inventario.`);
-    },
-    [recordMovement, uploadItemImage]
-  );
+    setInventoryStatus(`"${toDisplayName(itemName)}" se agrego al inventario.`);
+  }, []);
 
   const updateItem = useCallback(
-    async ({ itemName, itemCategory, itemImage }) => {
+    async ({ itemName, itemCategory, imagePreview }) => {
       if (!editingItem) {
         return;
       }
 
-      const normalizedName = normalizeItemName(itemName);
-      const previousNormalizedName = editingItem.normalizedName;
-      const nextImageUrl = await uploadItemImage(normalizedName, itemImage);
       const resolvedCategory = itemCategory || suggestCategoryFromText(itemName);
-      const nextPayload = buildItemPayload({
-        itemName,
-        normalizedName,
-        category: resolvedCategory,
-        quantity: editingItem.quantity,
-        imageUrl: nextImageUrl,
-      });
 
-      if (normalizedName === previousNormalizedName) {
-        await setDoc(
-          doc(collection(firestore, "inventory"), normalizedName),
-          nextPayload,
-          { merge: true }
-        );
-      } else {
-        await runTransaction(firestore, async (transaction) => {
-          const previousDocRef = doc(
-            collection(firestore, "inventory"),
-            previousNormalizedName
-          );
-          const nextDocRef = doc(
-            collection(firestore, "inventory"),
-            normalizedName
-          );
-          const nextDoc = await transaction.get(nextDocRef);
-
-          if (nextDoc.exists()) {
-            throw new Error("Ese producto ya existe en el inventario.");
-          }
-
-          transaction.set(nextDocRef, nextPayload, { merge: true });
-          transaction.delete(previousDocRef);
-        });
-      }
-
-      await recordMovement({
-        itemName: toDisplayName(itemName),
-        normalizedName,
-        action: "updated",
-        quantityChange: 0,
-        quantityAfter: editingItem.quantity,
-        category: resolvedCategory,
-        note: "Datos del producto actualizados.",
+      await requestInventory(`/api/inventory/${editingItem.normalizedName}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          itemName,
+          itemCategory: resolvedCategory,
+          imageDataUrl:
+            typeof imagePreview === "string" && imagePreview.startsWith("data:")
+              ? imagePreview
+              : "",
+          imageUrl:
+            typeof imagePreview === "string" ? imagePreview : editingItem.imageUrl || "",
+        }),
       });
 
       setInventoryStatus(`"${toDisplayName(itemName)}" se actualizo correctamente.`);
     },
-    [editingItem, recordMovement, uploadItemImage]
+    [editingItem]
   );
 
   const handleSubmit = useCallback(async () => {
@@ -356,41 +270,11 @@ export function useInventory() {
   const changeItemQuantity = useCallback(
     async (item, delta) => {
       try {
-        const docRef = doc(collection(firestore, "inventory"), item.normalizedName);
-        const nextQuantity = Math.max(0, item.quantity + delta);
-
-        await runTransaction(firestore, async (transaction) => {
-          const snapshot = await transaction.get(docRef);
-
-          if (!snapshot.exists()) {
-            return;
-          }
-
-          const data = snapshot.data();
-
-          transaction.set(
-            docRef,
-            {
-              ...data,
-              quantity: nextQuantity,
-              updatedAt: serverTimestamp(),
-            },
-            { merge: true }
-          );
+        const data = await requestInventory(`/api/inventory/${item.normalizedName}`, {
+          method: "PATCH",
+          body: JSON.stringify({ delta }),
         });
-
-        await recordMovement({
-          itemName: item.name,
-          normalizedName: item.normalizedName,
-          action: delta > 0 ? "incremented" : "decremented",
-          quantityChange: delta,
-          quantityAfter: nextQuantity,
-          category: item.category,
-          note:
-            delta > 0
-              ? "Entrada manual de inventario."
-              : "Salida manual de inventario.",
-        });
+        const nextQuantity = data.item?.quantity ?? item.quantity;
 
         setInventoryStatus(`Cantidad de "${item.name}" actualizada a ${nextQuantity}.`);
         await updateInventory();
@@ -399,22 +283,14 @@ export function useInventory() {
         setInventoryError("No se pudo actualizar la cantidad.");
       }
     },
-    [recordMovement, updateInventory]
+    [updateInventory]
   );
 
   const deleteItem = useCallback(
     async (item) => {
       try {
-        await deleteDoc(doc(collection(firestore, "inventory"), item.normalizedName));
-
-        await recordMovement({
-          itemName: item.name,
-          normalizedName: item.normalizedName,
-          action: "deleted",
-          quantityChange: -item.quantity,
-          quantityAfter: 0,
-          category: item.category,
-          note: "Producto eliminado del inventario.",
+        await requestInventory(`/api/inventory/${item.normalizedName}`, {
+          method: "DELETE",
         });
 
         setInventoryStatus(`"${item.name}" se elimino del inventario.`);
@@ -424,7 +300,7 @@ export function useInventory() {
         setInventoryError("No se pudo eliminar el producto.");
       }
     },
-    [recordMovement, updateInventory]
+    [updateInventory]
   );
 
   const handleAutoDetect = useCallback(async () => {
@@ -453,6 +329,10 @@ export function useInventory() {
         detectedName: detection.suggestedName || detection.detectedName || "",
         detectionSuggestions: detection.suggestions || [],
         suggestedCategory: detection.suggestedCategory || "",
+        itemName:
+          !current.itemName && (detection.suggestedName || detection.detectedName)
+            ? detection.suggestedName || detection.detectedName
+            : current.itemName,
         itemCategory:
           current.itemCategory === "Other" && detection.suggestedCategory
             ? detection.suggestedCategory

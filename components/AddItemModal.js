@@ -182,6 +182,10 @@ export default function AddItemModal({
 
             {formState.uploadOption === "auto" && (
               <Stack spacing={1.5}>
+                <Button variant="outlined" component="label" sx={{ alignSelf: "flex-start" }}>
+                  Seleccionar imagen para detectar
+                  <input hidden type="file" accept="image/*" onChange={onImageChange} />
+                </Button>
                 <Typography color="text.secondary">
                   {formState.detectedName ||
                     "Primero sube o captura una imagen y luego usa la deteccion automatica."}

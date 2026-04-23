@@ -6,7 +6,7 @@ Azul's Shop is an AI-assisted inventory manager built with Next.js, React, and M
 
 - Inventory management with quantity controls and product images
 - Smart image upload from local files or camera capture
-- Automatic product detection through a secure Google Cloud Vision server route
+- Automatic product detection through a secure OpenAI server route
 - Recipe suggestions generated through a secure OpenAI server route
 - Search and form validation for empty names, duplicates, and invalid images
 
@@ -23,8 +23,7 @@ Azul's Shop is an AI-assisted inventory manager built with Next.js, React, and M
 - Next.js App Router
 - React
 - Material UI
-- Firebase Firestore and Storage
-- Google Cloud Vision API
+- Supabase Postgres + Storage
 - OpenAI API
 - ESLint
 
@@ -48,18 +47,15 @@ npm install
 Create a `.env.local` file in the project root:
 
 ```bash
-NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_api_key
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_firebase_auth_domain
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_firebase_project_id
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_firebase_storage_bucket
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_firebase_sender_id
-NEXT_PUBLIC_FIREBASE_APP_ID=your_firebase_app_id
-NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=your_firebase_measurement_id
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+SUPABASE_STORAGE_BUCKET=inventory-images
 OPENAI_API_KEY=your_openai_api_key
 OPENAI_MODEL=gpt-4o-mini
+OPENAI_VISION_MODEL=gpt-4o-mini
 ```
 
-Google Cloud Vision should be configured on the server with Application Default Credentials or your hosting provider's credential mechanism.
+Luego crea el esquema de Supabase ejecutando el SQL de [supabase/schema.sql](/Users/azulramirezkuri/Documents/GitHub/inventory_tracker/supabase/schema.sql). Ese archivo crea las tablas `inventory_items`, `inventory_movements` y el bucket público `inventory-images`.
 
 ### 4. Run the development server
 
@@ -79,9 +75,12 @@ Open the app at `http://localhost:3000`.
 ## Project Structure
 
 - `app/page.js`: Main inventory UI and client interactions
-- `app/api/vision/route.js`: Secure server route for image label detection
+- `app/api/vision/route.js`: Secure server route for image detection with OpenAI
 - `app/api/recipes/route.js`: Secure server route for OpenAI recipe suggestions
-- `firebase.js`: Firebase configuration
+- `app/api/inventory/...`: Server routes para CRUD del inventario
+- `lib/server/supabase.js`: Cliente server-side para Supabase
+- `lib/server/inventory-store.js`: Capa de persistencia y movimientos
+- `supabase/schema.sql`: Esquema inicial para la base y el bucket
 - `public/`: Static assets
 
 ## Contributions

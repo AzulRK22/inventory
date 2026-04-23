@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import vision from "@google-cloud/vision";
-import { getSuggestedDetection } from "@/lib/inventory";
+import OpenAI from "openai";
+import { CATEGORY_OPTIONS, getSuggestedDetection } from "@/lib/inventory";
 
 export const runtime = "nodejs";
 
@@ -15,36 +15,79 @@ export async function POST(request) {
       );
     }
 
-    const visionClient = new vision.ImageAnnotatorClient();
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json(
+        { error: "Falta configurar OPENAI_API_KEY en el servidor." },
+        { status: 500 }
+      );
+    }
 
-    const [result] = await visionClient.labelDetection({
-      image: {
-        content: imageBase64,
-      },
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
     });
 
-    const labels = result.labelAnnotations ?? [];
-    const topLabels = labels
-      .slice(0, 6)
-      .map((label) => ({
-        description: label.description || "",
-        score: label.score || 0,
-      }))
-      .filter((label) => label.description);
-    const { suggestedName, suggestedCategory, suggestions } =
-      getSuggestedDetection(topLabels.map((label) => label.description));
+    const response = await openai.chat.completions.create({
+      model: process.env.OPENAI_VISION_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini",
+      temperature: 0.2,
+      max_tokens: 300,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: `Analiza fotos de productos para inventario. Responde solo con JSON valido que incluya suggestedName, suggestedCategory y suggestions. suggestedCategory debe ser una de: ${CATEGORY_OPTIONS.join(
+            ", "
+          )}. suggestions debe ser un arreglo corto de nombres posibles en español.`,
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Identifica el producto principal de esta imagen para registrarlo en un inventario de hogar.",
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:image/jpeg;base64,${imageBase64}`,
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    const content = response.choices[0]?.message?.content || "{}";
+    const parsed = JSON.parse(content);
+    const modelSuggestions = Array.isArray(parsed.suggestions)
+      ? parsed.suggestions.filter(Boolean)
+      : [];
+    const fallbackDetection = getSuggestedDetection([
+      parsed.suggestedName || "",
+      ...modelSuggestions,
+    ]);
+    const topLabels = modelSuggestions.slice(0, 6).map((label) => ({
+      description: label,
+      score: 1,
+    }));
 
     return NextResponse.json({
-      detectedName: suggestedName || "No se pudo detectar el nombre.",
-      suggestedName,
-      suggestedCategory,
-      suggestions,
+      detectedName:
+        parsed.suggestedName || fallbackDetection.suggestedName || "No se pudo detectar el nombre.",
+      suggestedName: parsed.suggestedName || fallbackDetection.suggestedName,
+      suggestedCategory:
+        parsed.suggestedCategory ||
+        fallbackDetection.suggestedCategory ||
+        "Other",
+      suggestions:
+        modelSuggestions.length > 0
+          ? modelSuggestions
+          : fallbackDetection.suggestions,
       labels: topLabels,
     });
   } catch (error) {
-    console.error("Vision API error:", error);
+    console.error("Vision replacement API error:", error);
     return NextResponse.json(
-      { error: "No se pudo procesar la imagen." },
+      { error: error?.message || "No se pudo procesar la imagen." },
       { status: 500 }
     );
   }
