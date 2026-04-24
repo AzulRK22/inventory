@@ -75,7 +75,7 @@ export default function Home() {
             container
             spacing={{ xs: 2, md: 2.5 }}
             alignItems="start"
-            sx={{ marginTop: 0.75 }}
+            sx={{ marginTop: { xs: 2.5, md: 3 } }}
           >
             <Grid item xs={12} lg={8}>
               <InventoryGrid
