@@ -63,7 +63,7 @@ export default function InventoryGrid({
     <Box>
       <Grid container spacing={{ xs: 2, md: 2.5 }}>
         {filteredInventory.map((item) => (
-          <Grid item xs={12} sm={6} xl={4} key={item.normalizedName}>
+          <Grid item xs={12} sm={6} lg={4} key={item.normalizedName}>
             <InventoryCard
               item={item}
               mutationState={itemMutationState[item.normalizedName] || {}}

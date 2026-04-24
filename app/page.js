@@ -77,7 +77,7 @@ export default function Home() {
             alignItems="start"
             sx={{ marginTop: 0.75 }}
           >
-            <Grid item xs={12} lg={8.5}>
+            <Grid item xs={12} lg={8}>
               <InventoryGrid
                 inventory={inventoryState.inventory}
                 filteredInventory={filteredInventory}
@@ -89,7 +89,7 @@ export default function Home() {
                 onDelete={inventoryState.requestDeleteItem}
               />
             </Grid>
-            <Grid item xs={12} lg={3.5}>
+            <Grid item xs={12} lg={4}>
               <InventoryInsightsPanel
                 recipeState={recipeState}
                 inventory={inventoryState.inventory}
